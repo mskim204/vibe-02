@@ -96,7 +96,7 @@
 <!-- 설정 화면 -->
 <div id="settings" class="screen">
   <h1>설정</h1>
-  <div class="guide" id="settingsGuide">바꾸고 싶은 칸을 클릭한 뒤 새 키를 누르세요</div>
+  <div class="guide" id="settingsGuide">바꾸고 싶은 키를 클릭한 뒤 새 키를 누르세요</div>
   <div id="keySlots"></div>
   <div class="bottom">
     <button class="btn small" id="resetKeysBtn">기본값으로</button>
@@ -167,7 +167,7 @@ const MODES = [
     id: 'normal', name: '일반 모드', desc: '총 20웨이브', totalWaves: 20, catchFrom: 5, catchChance: 0.15,
     wave(n) {
       const k = (n - 1) / 19;                       // 0 → 1
-      return { count: 10 + n * 2, interval: 0.85 - k * 0.45, speed: H * (0.5 + k * 0.75),
+      return { count: 6 + n, interval: 0.6 - k * 0.3, speed: H * (0.65 + k * 0.8),
                maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
     }
   },
@@ -176,7 +176,7 @@ const MODES = [
     locked: () => !normalCleared, lockText: '일반 모드를 클리어하면 열려요',
     wave(n) {
       const k = (n - 1) / 19;
-      return { count: 12 + n * 2, interval: 0.7 - k * 0.4, speed: H * (0.7 + k * 0.85),
+      return { count: 8 + n, interval: 0.5 - k * 0.28, speed: H * (0.85 + k * 0.9),
                maxAtOnce: n < 3 ? 2 : 3 };
     }
   },
@@ -185,7 +185,7 @@ const MODES = [
     wave(n) {
       // 20웨이브까지는 일반 모드와 같고, 그 뒤로는 천천히 계속 어려워짐 (상한 있음)
       const k = n <= 20 ? (n - 1) / 19 : Math.min(1.6, 1 + (n - 20) * 0.03);
-      return { count: 10 + Math.min(n, 30) * 2, interval: Math.max(0.25, 0.85 - k * 0.45), speed: H * (0.5 + k * 0.75),
+      return { count: 6 + Math.min(n, 30), interval: Math.max(0.2, 0.6 - k * 0.3), speed: H * (0.65 + k * 0.8),
                maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
     }
   }
@@ -219,15 +219,17 @@ window.addEventListener('resize', resize);
 function laneCenter(i) { return fieldLeft + laneW * (i + 0.5); }
 
 /* =========================================================
-   키 설정 (칸마다 키 하나: 누르면 그 칸으로 바로 이동)
+   키 설정 (키 2개: 왼쪽으로 한 칸 / 오른쪽으로 한 칸)
    e.code를 저장하므로 한/영 입력 상태와 상관없이 동작합니다.
    ========================================================= */
-const DEFAULT_KEYS = ['KeyA', 'KeyW', 'KeyS', 'KeyD'];
+const DEFAULT_KEYS = ['ArrowLeft', 'ArrowRight'];
+const KEY_NAMES = ['왼쪽으로', '오른쪽으로'];
+const KEY_DIRS = [-1, 1];
 const LANE_NAMES = ['맨 왼쪽', '왼쪽', '오른쪽', '맨 오른쪽'];
 let keys = DEFAULT_KEYS.slice();
 try {
   const saved = JSON.parse(localStorage.getItem('dodgeKeys'));
-  if (Array.isArray(saved) && saved.length === LANES) keys = saved;
+  if (Array.isArray(saved) && saved.length === DEFAULT_KEYS.length) keys = saved;
 } catch (e) {}
 function saveKeys() {
   try { localStorage.setItem('dodgeKeys', JSON.stringify(keys)); } catch (e) {}
@@ -257,26 +259,25 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (state === 'tutorial' || state === 'play') {
-    const lane = keys.indexOf(e.code);
-    if (lane >= 0) {
+    const k = keys.indexOf(e.code);
+    if (k >= 0) {
       e.preventDefault();
-      movePlayer(lane);
+      movePlayer(player.lane + KEY_DIRS[k]);
     }
   }
 });
 
 function movePlayer(lane) {
-  if (Math.abs(lane - player.lane) !== 1) return;   // 바로 옆 칸으로만 이동 가능
+  if (lane < 0 || lane >= LANES || Math.abs(lane - player.lane) !== 1) return;   // 바로 옆 칸으로만 이동 가능
   player.lane = lane;
   player.x = laneCenter(lane);
   if (state === 'tutorial' && TUT_STEPS[tut.step].onMove) TUT_STEPS[tut.step].onMove(lane);
 }
 
-/* 클릭(터치)으로 이동: 클릭한 칸이 바로 옆 칸이면 이동 */
+/* 클릭(터치)으로 이동: 플레이어보다 왼쪽을 누르면 왼쪽으로, 오른쪽을 누르면 오른쪽으로 한 칸 */
 canvas.addEventListener('pointerdown', e => {
   if (state !== 'tutorial' && state !== 'play') return;
-  const lane = Math.floor((e.clientX - fieldLeft) / laneW);
-  if (lane >= 0 && lane < LANES) movePlayer(lane);
+  movePlayer(player.lane + (e.clientX < player.x ? -1 : 1));
 });
 
 function spawnTile(lane, type, speed) {
@@ -335,15 +336,15 @@ function draw() {
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillRect(player.x - player.w / 2, playerY - player.h / 2, player.w, player.h);
 
-  // 칸 아래에 키 표시 (현재 칸 > 이동 가능한 옆 칸 > 나머지 순으로 밝게)
+  // 플레이어 양옆 칸 아래에 이동 키 표시 (끝 칸이라 못 가는 쪽은 표시 안 함)
   ctx.font = 'bold 18px "Malgun Gothic", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  for (let i = 0; i < LANES; i++) {
-    const d = Math.abs(i - player.lane);
-    ctx.fillStyle = d === 0 ? 'rgba(255,255,255,0.95)' : d === 1 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)';
-    ctx.fillText(keyLabel(keys[i]), laneCenter(i), H - 40);
-  }
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  keys.forEach((k, i) => {
+    const lane = player.lane + KEY_DIRS[i];
+    if (lane >= 0 && lane < LANES) ctx.fillText(keyLabel(k), laneCenter(lane), H - 40);
+  });
 
   if (flash > 0) {
     ctx.fillStyle = `rgba(${flashColor},${flash * 0.35})`;
@@ -417,12 +418,11 @@ const TUT_STEPS = [
       return `<div class="step">${stepLabel()}</div>
         <h2>움직이는 방법</h2>
         <p>아래쪽의 <b>반투명한 네모</b>가 바로 당신이에요.<br>
-        각 칸 아래에 적힌 <b>키를 누르거나</b>, 가고 싶은 <b>칸을 클릭</b>하면 이동해요.<br>
-        단, <b>바로 옆 칸으로만</b> 한 칸씩 이동할 수 있어요.<br>
-        (멀리 있는 칸으로 가려면 옆 칸을 차례로 눌러야 해요)</p>
+        <b>${keyLabel(keys[0])}</b> 키를 누르면 왼쪽으로, <b>${keyLabel(keys[1])}</b> 키를 누르면 오른쪽으로 <b>한 칸씩</b> 이동해요.<br>
+        화면에서 내 위치보다 <b>왼쪽/오른쪽을 클릭</b>해도 그쪽으로 한 칸 이동해요.</p>
         <p style="margin-top:8px">4개의 칸을 모두 한 번씩 가 보세요!</p>
         <div class="checks">
-          ${keys.map((k, i) => `<span class="${tut.visited[i] ? 'done' : ''}">${tut.visited[i] ? '✔' : '○'} ${keyLabel(k)} (${LANE_NAMES[i]})</span>`).join('')}
+          ${LANE_NAMES.map((name, i) => `<span class="${tut.visited[i] ? 'done' : ''}">${tut.visited[i] ? '✔' : '○'} ${name}</span>`).join('')}
         </div>
         <p style="margin-top:10px;font-size:13px;opacity:.55">키는 홈 화면 왼쪽 위 ⚙ 설정에서 바꿀 수 있어요.</p>`;
     },
@@ -562,12 +562,12 @@ function startWave(n) {
   game.maxAtOnce = c.maxAtOnce;
   game.spawnTimer = 0;
   game.nextCatch = false;
-  game.pause = 1.4;
+  game.pause = 0.7;
   const finite = game.totalWaves !== Infinity;
   $('hudWave').textContent = finite ? `WAVE ${n} / ${game.totalWaves}` : `WAVE ${n}`;
   $('hudSub').textContent = finite ? game.mode.name : `${game.mode.name} · 최고 기록 WAVE ${endlessBest}`;
-  if (n === game.mode.catchFrom && n > 1) showBanner('반투명 타일 등장!', 1600);
-  else showBanner(n === game.totalWaves ? 'FINAL WAVE' : `WAVE ${n}`);
+  if (n === game.mode.catchFrom && n > 1) showBanner('반투명 타일 등장!', 1200);
+  else showBanner(n === game.totalWaves ? 'FINAL WAVE' : `WAVE ${n}`, 800);
 }
 
 function startMode(mode) {
@@ -688,13 +688,13 @@ function renderSettings() {
   keys.forEach((k, i) => {
     const b = document.createElement('button');
     b.className = 'btn key-slot' + (waitingSlot === i ? ' waiting' : '');
-    b.innerHTML = `<div class="lane">${LANE_NAMES[i]}</div><div class="key">${waitingSlot === i ? '?' : keyLabel(k)}</div>`;
+    b.innerHTML = `<div class="lane">${KEY_NAMES[i]}</div><div class="key">${waitingSlot === i ? '?' : keyLabel(k)}</div>`;
     b.onclick = () => { waitingSlot = i; renderSettings(); };
     box.appendChild(b);
   });
   $('settingsGuide').textContent = waitingSlot >= 0
-    ? `'${LANE_NAMES[waitingSlot]}' 칸에 쓸 키를 누르세요 (Esc: 취소)`
-    : '바꾸고 싶은 칸을 클릭한 뒤 새 키를 누르세요';
+    ? `'${KEY_NAMES[waitingSlot]}' 이동에 쓸 키를 누르세요 (Esc: 취소)`
+    : '바꾸고 싶은 키를 클릭한 뒤 새 키를 누르세요';
 }
 function openSettings() {
   state = 'settings';
