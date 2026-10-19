@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>피하기 게임</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;-webkit-user-select:none;user-select:none}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;color:#fff}
+  canvas{display:block;position:fixed;inset:0}
+
+  .screen{position:fixed;inset:0;display:none;z-index:10}
+  .screen.active{display:block}
+
+  /* 버튼 */
+  .btn{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.8);border-radius:10px;
+       padding:14px 28px;font-size:18px;cursor:pointer;transition:background .15s,color .15s}
+  .btn:hover{background:#fff;color:#000}
+  .btn.small{padding:8px 16px;font-size:14px;border-width:1px}
+
+  /* 홈 화면 */
+  #home .title{position:absolute;top:22%;left:0;right:0;text-align:center;font-size:56px;font-weight:bold;letter-spacing:6px}
+  #home .subtitle{position:absolute;top:calc(22% + 76px);left:0;right:0;text-align:center;color:rgba(255,255,255,.55);font-size:16px}
+  #home .top-right{position:absolute;top:20px;right:20px}
+  #home .top-left{position:absolute;top:20px;left:20px}
+
+  /* 설정 화면 */
+  #settings h1{position:absolute;top:14%;left:0;right:0;text-align:center;font-size:36px;letter-spacing:4px}
+  #settings .guide{position:absolute;top:calc(14% + 56px);left:0;right:0;text-align:center;font-size:15px;opacity:.6}
+  #keySlots{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
+            display:flex;justify-content:center;gap:14px;flex-wrap:wrap;padding:0 16px}
+  .key-slot{width:120px;padding:18px 8px;text-align:center}
+  .key-slot .lane{font-size:13px;opacity:.65}
+  .key-slot .key{font-size:34px;font-weight:bold;margin-top:8px;min-height:44px}
+  .key-slot.waiting{background:#fff;color:#000}
+  #settings .bottom{position:absolute;bottom:14%;left:0;right:0;display:flex;justify-content:center;gap:12px}
+  /* 모드 버튼들: 가운데 정렬 → 모드가 늘어나도 대칭으로 배치 */
+  #modes{position:absolute;top:50%;left:0;right:0;transform:translateY(-50%);
+         display:flex;justify-content:center;gap:24px;flex-wrap:wrap;padding:0 16px}
+  .mode-card{width:200px;padding:28px 16px;text-align:center}
+  .mode-card .name{font-size:22px;font-weight:bold}
+  .mode-card .desc{font-size:13px;opacity:.65;margin-top:8px}
+  .mode-card.locked{opacity:.4;cursor:not-allowed}
+  .mode-card.locked:hover{background:transparent;color:#fff}
+
+  /* 게임 HUD */
+  #hud{position:fixed;top:16px;left:0;right:0;text-align:center;z-index:5;pointer-events:none;display:none}
+  #hud .wave{font-size:22px;font-weight:bold;letter-spacing:2px}
+  #hud .sub{font-size:13px;opacity:.6;margin-top:4px}
+  #exitBtn{position:fixed;top:16px;left:16px;z-index:6;display:none}
+
+  /* 튜토리얼 안내 박스 */
+  #tutBox{position:fixed;top:8%;left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 32px));
+          background:rgba(20,20,20,.92);border:1px solid rgba(255,255,255,.35);border-radius:14px;
+          padding:22px 24px;text-align:center;z-index:8;display:none}
+  #tutBox .step{font-size:12px;opacity:.55;letter-spacing:2px}
+  #tutBox h2{font-size:24px;margin:8px 0 10px}
+  #tutBox p{font-size:15px;line-height:1.7;opacity:.9}
+  #tutBox .checks{margin-top:12px;display:flex;justify-content:center;gap:18px;font-size:14px}
+  #tutBox .checks span{opacity:.45}
+  #tutBox .checks span.done{opacity:1}
+  #tutBox .actions{margin-top:16px;display:flex;justify-content:center;gap:10px}
+  #tutBox .tile-list{margin-top:14px;text-align:left}
+  #tutBox .tile-group{margin-top:10px}
+  #tutBox .tile-group .label{font-size:13px;font-weight:bold;margin-bottom:6px}
+  #tutBox .tile-row{display:flex;align-items:center;gap:14px;padding:8px 10px;border-radius:8px;background:rgba(255,255,255,.05)}
+  #tutBox .tile-row .sample{width:70px;height:14px;flex-shrink:0}
+  #tutBox .tile-row .info{font-size:14px;line-height:1.5}
+  #skipBtn{position:fixed;top:16px;right:16px;z-index:9;display:none}
+
+  /* 결과 화면 */
+  #result{background:rgba(0,0,0,.75)}
+  #result .box{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:min(420px,calc(100% - 32px))}
+  #result h1{font-size:44px;margin-bottom:12px}
+  #result p{opacity:.7;margin-bottom:28px}
+  #result .actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap}
+
+  /* 웨이브 알림 */
+  #banner{position:fixed;top:40%;left:0;right:0;text-align:center;font-size:40px;font-weight:bold;letter-spacing:4px;
+          z-index:7;pointer-events:none;opacity:0;transition:opacity .3s}
+  #banner.show{opacity:1}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- 홈 화면 -->
+<div id="home" class="screen">
+  <div class="top-left"><button class="btn small" id="settingsBtn">⚙ 설정</button></div>
+  <div class="top-right"><button class="btn small" id="replayTutBtn">튜토리얼 다시 플레이</button></div>
+  <div class="title">DODGE</div>
+  <div class="subtitle">떨어지는 타일을 피하세요</div>
+  <div id="modes"></div>
+</div>
+
+<!-- 설정 화면 -->
+<div id="settings" class="screen">
+  <h1>설정</h1>
+  <div class="guide" id="settingsGuide">바꾸고 싶은 칸을 클릭한 뒤 새 키를 누르세요</div>
+  <div id="keySlots"></div>
+  <div class="bottom">
+    <button class="btn small" id="resetKeysBtn">기본값으로</button>
+    <button class="btn small" id="settingsBackBtn">홈으로</button>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div id="result" class="screen">
+  <div class="box">
+    <h1 id="resultTitle"></h1>
+    <p id="resultText"></p>
+    <div class="actions">
+      <button class="btn" id="retryBtn">다시 하기</button>
+      <button class="btn" id="homeBtn">홈으로</button>
+    </div>
+  </div>
+</div>
+
+<div id="hud"><div class="wave" id="hudWave"></div><div class="sub" id="hudSub"></div></div>
+<button class="btn small" id="exitBtn">나가기</button>
+<button class="btn small" id="skipBtn">튜토리얼 건너뛰기</button>
+<div id="tutBox"></div>
+<div id="banner"></div>
+
+<script>
+/* =========================================================
+   타일 종류 정의
+   새 타일을 추가하면 튜토리얼 소개 화면에 자동으로 나타납니다.
+   kind: 'avoid' → 피해야 하는 타일 (닿으면 실패)
+   kind: 'catch' → 꼭 닿아야 하는 타일 (놓치면 실패)
+   kind: 'safe'  → 피하지 않아도 되는 타일 (onCatch로 효과 지정)
+   ========================================================= */
+const TILE_TYPES = {
+  white: {
+    name: '하얀색 타일',
+    color: '#ffffff',
+    kind: 'avoid',
+    desc: '닿으면 게임 오버! 반드시 피해야 해요.'
+  },
+  ghost: {
+    name: '반투명 타일',
+    color: 'rgba(255,255,255,0.5)',
+    kind: 'catch',
+    desc: '플레이어와 똑같이 생긴 타일이에요. 꼭 닿아야 해요! 놓치면 게임 오버.'
+  }
+};
+const KIND_INFO = {
+  avoid: { label: '⛔ 피해야 하는 타일', verb: '피하기' },
+  catch: { label: '✅ 꼭 닿아야 하는 타일', verb: '닿기' },
+  safe:  { label: '🙂 피하지 않아도 되는 타일', verb: '받기' }
+};
+const typesOfKind = kind => Object.keys(TILE_TYPES).filter(k => TILE_TYPES[k].kind === kind);
+
+/* ---------- 기록 저장 ---------- */
+function load(key, def) { try { const v = localStorage.getItem(key); return v === null ? def : JSON.parse(v); } catch (e) { return def; } }
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+let normalCleared = load('dodgeNormalCleared', false);
+let endlessBest = load('dodgeEndlessBest', 0);
+
+/* =========================================================
+   게임 모드 정의
+   여기에 모드를 추가하면 홈 화면 가운데에 대칭으로 배치됩니다.
+   catchFrom: 반투명 타일이 나오기 시작하는 웨이브
+   ========================================================= */
+const MODES = [
+  {
+    id: 'normal', name: '일반 모드', desc: '총 20웨이브', totalWaves: 20, catchFrom: 5, catchChance: 0.15,
+    wave(n) {
+      const k = (n - 1) / 19;                       // 0 → 1
+      return { count: 10 + n * 2, interval: 0.85 - k * 0.45, speed: H * (0.5 + k * 0.75),
+               maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
+    }
+  },
+  {
+    id: 'hard', name: '하드 모드', desc: '총 20웨이브 · 더 빠르고 촘촘하게', totalWaves: 20, catchFrom: 1, catchChance: 0.2,
+    locked: () => !normalCleared, lockText: '일반 모드를 클리어하면 열려요',
+    wave(n) {
+      const k = (n - 1) / 19;
+      return { count: 12 + n * 2, interval: 0.7 - k * 0.4, speed: H * (0.7 + k * 0.85),
+               maxAtOnce: n < 3 ? 2 : 3 };
+    }
+  },
+  {
+    id: 'endless', name: '무한 모드', desc: '끝없이 버텨 보세요', totalWaves: Infinity, catchFrom: 5, catchChance: 0.15,
+    wave(n) {
+      // 20웨이브까지는 일반 모드와 같고, 그 뒤로는 천천히 계속 어려워짐 (상한 있음)
+      const k = n <= 20 ? (n - 1) / 19 : Math.min(1.6, 1 + (n - 20) * 0.03);
+      return { count: 10 + Math.min(n, 30) * 2, interval: Math.max(0.25, 0.85 - k * 0.45), speed: H * (0.5 + k * 0.75),
+               maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
+    }
+  }
+];
+
+/* ---------- 기본 설정 ---------- */
+const LANES = 4;               // 중앙 기준 왼쪽 2칸 + 오른쪽 2칸
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W, H, laneW, fieldLeft, playerY;
+
+const player = { lane: 1, x: 0, w: 0, h: 16 };
+let tiles = [];
+let state = 'home';            // home | tutorial | play | result
+let lastTime = 0;
+let flash = 0;                 // 화면 깜빡임 (실패: 빨강, 반투명 타일 닿음: 흰색)
+let flashColor = '255,60,60';
+function doFlash(good) { flash = good ? 0.6 : 1; flashColor = good ? '255,255,255' : '255,60,60'; }
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  laneW = Math.min(140, (W - 32) / LANES);
+  fieldLeft = W / 2 - laneW * LANES / 2;
+  player.w = laneW * 0.85;
+  playerY = H - 90;
+  player.x = laneCenter(player.lane);
+}
+window.addEventListener('resize', resize);
+
+function laneCenter(i) { return fieldLeft + laneW * (i + 0.5); }
+
+/* =========================================================
+   키 설정 (칸마다 키 하나: 누르면 그 칸으로 바로 이동)
+   e.code를 저장하므로 한/영 입력 상태와 상관없이 동작합니다.
+   ========================================================= */
+const DEFAULT_KEYS = ['KeyA', 'KeyW', 'KeyS', 'KeyD'];
+const LANE_NAMES = ['맨 왼쪽', '왼쪽', '오른쪽', '맨 오른쪽'];
+let keys = DEFAULT_KEYS.slice();
+try {
+  const saved = JSON.parse(localStorage.getItem('dodgeKeys'));
+  if (Array.isArray(saved) && saved.length === LANES) keys = saved;
+} catch (e) {}
+function saveKeys() {
+  try { localStorage.setItem('dodgeKeys', JSON.stringify(keys)); } catch (e) {}
+}
+function keyLabel(code) {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code.startsWith('Numpad')) return 'Num' + code.slice(6);
+  const map = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Space: 'Space',
+                Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', BracketLeft: '[', BracketRight: ']' };
+  return map[code] || code;
+}
+
+let waitingSlot = -1;          // 설정 화면에서 새 키를 기다리는 칸
+window.addEventListener('keydown', e => {
+  if (state === 'settings') {
+    if (waitingSlot < 0) return;
+    e.preventDefault();
+    if (e.code !== 'Escape') {
+      const dup = keys.indexOf(e.code);
+      if (dup >= 0) keys[dup] = keys[waitingSlot];   // 이미 쓰는 키면 서로 바꿈
+      keys[waitingSlot] = e.code;
+      saveKeys();
+    }
+    waitingSlot = -1;
+    renderSettings();
+    return;
+  }
+  if (state === 'tutorial' || state === 'play') {
+    const lane = keys.indexOf(e.code);
+    if (lane >= 0) {
+      e.preventDefault();
+      movePlayer(lane);
+    }
+  }
+});
+
+function movePlayer(lane) {
+  if (Math.abs(lane - player.lane) !== 1) return;   // 바로 옆 칸으로만 이동 가능
+  player.lane = lane;
+  player.x = laneCenter(lane);
+  if (state === 'tutorial' && TUT_STEPS[tut.step].onMove) TUT_STEPS[tut.step].onMove(lane);
+}
+
+/* 클릭(터치)으로 이동: 클릭한 칸이 바로 옆 칸이면 이동 */
+canvas.addEventListener('pointerdown', e => {
+  if (state !== 'tutorial' && state !== 'play') return;
+  const lane = Math.floor((e.clientX - fieldLeft) / laneW);
+  if (lane >= 0 && lane < LANES) movePlayer(lane);
+});
+
+function spawnTile(lane, type, speed) {
+  tiles.push({ lane, type, x: laneCenter(lane), y: -20, prevY: -20, w: laneW * 0.85, h: 16, speed });
+}
+
+/* 플레이어 주변 칸일수록 더 자주 떨어지도록 가중치를 두고 칸을 고름 */
+function pickLanes(n) {
+  const pool = [0, 1, 2, 3];
+  const result = [];
+  while (result.length < n) {
+    const weights = pool.map(l => { const d = Math.abs(l - player.lane); return d === 0 ? 4 : d === 1 ? 2.5 : 1; });
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let idx = 0;
+    while (r >= weights[idx]) r -= weights[idx++];
+    result.push(pool.splice(idx, 1)[0]);
+  }
+  return result;
+}
+
+/* 반투명(꼭 닿아야 하는) 타일을 놓쳤는지: 플레이어 줄을 완전히 지나감 */
+function missed(t) { return t.y - t.h / 2 > playerY + player.h / 2; }
+
+// 지난 프레임~이번 프레임 사이에 지나간 구간 전체로 검사 (빠른 타일이 플레이어를 뚫고 지나가지 않도록)
+function hits(t) {
+  return Math.abs(t.x - player.x) < (t.w + player.w) / 2 &&
+         t.y + t.h / 2 >= playerY - player.h / 2 &&
+         t.prevY - t.h / 2 <= playerY + player.h / 2;
+}
+
+/* ---------- 그리기 ---------- */
+function draw() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+
+  if (state === 'home') return;
+
+  // 레인 구분선
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= LANES; i++) {
+    const x = Math.round(fieldLeft + laneW * i);
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  // 중앙선 강조
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath(); ctx.moveTo(Math.round(W / 2), 0); ctx.lineTo(Math.round(W / 2), H); ctx.stroke();
+
+  // 타일
+  for (const t of tiles) {
+    ctx.fillStyle = TILE_TYPES[t.type].color;
+    ctx.fillRect(t.x - t.w / 2, t.y - t.h / 2, t.w, t.h);
+  }
+
+  // 플레이어 (반투명 흰색 가로 네모)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(player.x - player.w / 2, playerY - player.h / 2, player.w, player.h);
+
+  // 칸 아래에 키 표시 (현재 칸 > 이동 가능한 옆 칸 > 나머지 순으로 밝게)
+  ctx.font = 'bold 18px "Malgun Gothic", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < LANES; i++) {
+    const d = Math.abs(i - player.lane);
+    ctx.fillStyle = d === 0 ? 'rgba(255,255,255,0.95)' : d === 1 ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)';
+    ctx.fillText(keyLabel(keys[i]), laneCenter(i), H - 40);
+  }
+
+  if (flash > 0) {
+    ctx.fillStyle = `rgba(${flashColor},${flash * 0.35})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+/* ---------- 메인 루프 ---------- */
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000 || 0);
+  lastTime = now;
+
+  if (state === 'tutorial' || state === 'play') {
+    for (const t of tiles) { t.prevY = t.y; t.y += t.speed * dt; }
+    if (state === 'tutorial') updateTutorial(dt);
+    else updateGame(dt);
+  }
+  flash = Math.max(0, flash - dt * 2.5);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- 화면 전환 ---------- */
+const $ = id => document.getElementById(id);
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+}
+function hideGameUI() {
+  $('hud').style.display = 'none';
+  $('exitBtn').style.display = 'none';
+  $('skipBtn').style.display = 'none';
+  $('tutBox').style.display = 'none';
+  $('banner').classList.remove('show');
+}
+function goHome() {
+  state = 'home';
+  tiles = [];
+  hideGameUI();
+  buildModes();
+  showScreen('home');
+}
+let bannerTimer;
+function showBanner(text, ms = 1300) {
+  const b = $('banner');
+  b.textContent = text;
+  b.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.remove('show'), ms);
+}
+
+/* =========================================================
+   튜토리얼
+   ========================================================= */
+const tut = { step: 0, visited: [], progress: {}, goal: 3, timer: 0 };
+const stepLabel = () => `튜토리얼 ${tut.step + 1} / ${TUT_STEPS.length}`;
+
+function tileSampleHTML(key) {
+  const t = TILE_TYPES[key];
+  return `<div class="tile-row"><div class="sample" style="background:${t.color}"></div>
+          <div class="info"><b>${t.name}</b><br>${t.desc}</div></div>`;
+}
+
+const TUT_STEPS = [
+  {
+    // 1. 움직이는 방법
+    enter() {
+      tut.visited = [false, false, false, false];
+      tut.visited[player.lane] = true;
+    },
+    render() {
+      return `<div class="step">${stepLabel()}</div>
+        <h2>움직이는 방법</h2>
+        <p>아래쪽의 <b>반투명한 네모</b>가 바로 당신이에요.<br>
+        각 칸 아래에 적힌 <b>키를 누르거나</b>, 가고 싶은 <b>칸을 클릭</b>하면 이동해요.<br>
+        단, <b>바로 옆 칸으로만</b> 한 칸씩 이동할 수 있어요.<br>
+        (멀리 있는 칸으로 가려면 옆 칸을 차례로 눌러야 해요)</p>
+        <p style="margin-top:8px">4개의 칸을 모두 한 번씩 가 보세요!</p>
+        <div class="checks">
+          ${keys.map((k, i) => `<span class="${tut.visited[i] ? 'done' : ''}">${tut.visited[i] ? '✔' : '○'} ${keyLabel(k)} (${LANE_NAMES[i]})</span>`).join('')}
+        </div>
+        <p style="margin-top:10px;font-size:13px;opacity:.55">키는 홈 화면 왼쪽 위 ⚙ 설정에서 바꿀 수 있어요.</p>`;
+    },
+    onMove(lane) {
+      if (tut.visited[lane]) return;
+      tut.visited[lane] = true;
+      renderTut();
+      if (tut.visited.every(v => v)) nextTutStep(600);
+    }
+  },
+  {
+    // 2. 떨어지는 타일 소개 (TILE_TYPES 기반 자동 생성)
+    render() {
+      let html = `<div class="step">${stepLabel()}</div>
+        <h2>떨어지는 타일</h2>
+        <p>위에서 타일이 <b>4개의 칸</b> 중 한 곳으로 떨어져요.<br>
+        중앙을 기준으로 왼쪽 2칸, 오른쪽 2칸이고, <b>내가 있는 칸 근처</b>에 더 자주 떨어져요.</p>
+        <div class="tile-list">`;
+      for (const kind of Object.keys(KIND_INFO)) {
+        const list = typesOfKind(kind);
+        if (list.length) html += `<div class="tile-group"><div class="label">${KIND_INFO[kind].label}</div>${list.map(tileSampleHTML).join('')}</div>`;
+      }
+      html += `</div><div class="actions"><button class="btn small" onclick="nextTutStep()">알겠어요!</button></div>`;
+      return html;
+    }
+  },
+  {
+    // 3. 연습 (타일 종류마다 3번씩)
+    enter() {
+      tut.progress = {};
+      for (const k of Object.keys(TILE_TYPES)) tut.progress[k] = 0;
+      tut.timer = 0.8;
+    },
+    render() {
+      const items = Object.keys(TILE_TYPES).map(k =>
+        `<span class="${tut.progress[k] >= tut.goal ? 'done' : ''}">${tut.progress[k] >= tut.goal ? '✔' : '○'} ${TILE_TYPES[k].name} ${KIND_INFO[TILE_TYPES[k].kind].verb}: ${tut.progress[k]} / ${tut.goal}</span>`).join('');
+      const rules = Object.keys(TILE_TYPES).map(k => `<b>${TILE_TYPES[k].name}</b> → ${KIND_INFO[TILE_TYPES[k].kind].verb}`).join(' / ');
+      return `<div class="step">${stepLabel()}</div>
+        <h2>연습해 봐요</h2>
+        <p>타일이 천천히 떨어져요.<br>${rules}<br>
+        연습이니까 실수해도 괜찮아요.</p>
+        <div class="checks" style="flex-wrap:wrap">${items}</div>`;
+    },
+    update(dt) {
+      tut.timer -= dt;
+      const left = Object.keys(TILE_TYPES).filter(k => tut.progress[k] < tut.goal);
+      if (tut.timer <= 0 && tiles.length === 0 && left.length) {
+        spawnTile(pickLanes(1)[0], left[Math.floor(Math.random() * left.length)], 230);
+      }
+      for (let i = tiles.length - 1; i >= 0; i--) {
+        const t = tiles[i];
+        const kind = TILE_TYPES[t.type].kind;
+        let result = null;                     // 'ok' | 'fail'
+        if (hits(t)) result = kind === 'avoid' ? 'fail' : 'ok';
+        else if (kind === 'catch' && missed(t)) result = 'fail';
+        else if (t.y - t.h / 2 > H) result = 'ok';
+        if (!result) continue;
+        tiles.splice(i, 1);
+        if (result === 'fail') {
+          doFlash(false);
+          showBanner(kind === 'catch' ? '앗! 닿아야 해요' : '앗! 다시 해 봐요', 1000);
+          tut.timer = 1;
+        } else {
+          if (kind !== 'avoid') doFlash(true);
+          tut.progress[t.type]++;
+          tut.timer = 0.4;
+          renderTut();
+          if (Object.keys(TILE_TYPES).every(k => tut.progress[k] >= tut.goal)) nextTutStep(400);
+        }
+      }
+    }
+  },
+  {
+    // 4. 완료
+    render() {
+      return `<div class="step">${stepLabel()}</div>
+        <h2>튜토리얼 완료! 🎉</h2>
+        <p>잘했어요! 이제 준비가 끝났어요.<br>
+        홈 화면에서 모드를 골라 본 게임을 시작해 보세요.</p>
+        <div class="actions"><button class="btn small" onclick="goHome()">홈으로 가기</button></div>`;
+    }
+  }
+];
+
+function renderTut() {
+  $('tutBox').innerHTML = TUT_STEPS[tut.step].render();
+}
+let tutStepTimer;
+function nextTutStep(delay = 0) {
+  if (tut.pending) return;
+  tut.pending = true;
+  tutStepTimer = setTimeout(() => {
+    tut.pending = false;
+    if (state !== 'tutorial') return;
+    tut.step++;
+    tiles = [];
+    const s = TUT_STEPS[tut.step];
+    if (s.enter) s.enter();
+    renderTut();
+  }, delay);
+}
+function startTutorial() {
+  clearTimeout(tutStepTimer);
+  state = 'tutorial';
+  tiles = [];
+  tut.step = 0;
+  tut.pending = false;
+  player.lane = 1; player.x = laneCenter(1);
+  showScreen(null);
+  hideGameUI();
+  $('tutBox').style.display = 'block';
+  $('skipBtn').style.display = 'block';
+  TUT_STEPS[0].enter();
+  renderTut();
+}
+function updateTutorial(dt) {
+  const s = TUT_STEPS[tut.step];
+  if (s.update) s.update(dt);
+}
+
+/* =========================================================
+   게임 진행 (일반 / 하드 / 무한 공통)
+   wave(n)이 돌려주는 값:
+     count     웨이브당 타일 묶음 수
+     interval  생성 간격(초)
+     speed     낙하 속도(px/s)
+     maxAtOnce 동시에 떨어지는 최대 개수 (항상 1칸은 비움)
+   ========================================================= */
+const game = { mode: null, wave: 0, totalWaves: 20, toSpawn: 0, spawnTimer: 0, interval: 1, speed: 300, pause: 0 };
+
+function startWave(n) {
+  game.wave = n;
+  const c = game.mode.wave(n);
+  game.toSpawn = c.count;
+  game.interval = c.interval;
+  game.speed = c.speed;
+  game.maxAtOnce = c.maxAtOnce;
+  game.spawnTimer = 0;
+  game.nextCatch = false;
+  game.pause = 1.4;
+  const finite = game.totalWaves !== Infinity;
+  $('hudWave').textContent = finite ? `WAVE ${n} / ${game.totalWaves}` : `WAVE ${n}`;
+  $('hudSub').textContent = finite ? game.mode.name : `${game.mode.name} · 최고 기록 WAVE ${endlessBest}`;
+  if (n === game.mode.catchFrom && n > 1) showBanner('반투명 타일 등장!', 1600);
+  else showBanner(n === game.totalWaves ? 'FINAL WAVE' : `WAVE ${n}`);
+}
+
+function startMode(mode) {
+  game.mode = mode;
+  game.totalWaves = mode.totalWaves;
+  state = 'play';
+  tiles = [];
+  player.lane = 1; player.x = laneCenter(1);
+  showScreen(null);
+  hideGameUI();
+  $('hud').style.display = 'block';
+  $('exitBtn').style.display = 'block';
+  startWave(1);
+}
+
+function spawnCatch() {
+  const catchTypes = typesOfKind('catch');
+  spawnTile(pickLanes(1)[0], catchTypes[Math.floor(Math.random() * catchTypes.length)], game.speed);
+}
+
+function spawnGroup() {
+  const avoidTypes = typesOfKind('avoid');
+  const n = 1 + Math.floor(Math.random() * game.maxAtOnce);
+  for (const l of pickLanes(n)) spawnTile(l, avoidTypes[Math.floor(Math.random() * avoidTypes.length)], game.speed);
+}
+
+function updateGame(dt) {
+  if (game.pause > 0) { game.pause -= dt; }
+  else if (game.toSpawn > 0) {
+    game.spawnTimer -= dt;
+    if (game.spawnTimer <= 0) {
+      // 반투명 타일은 혼자 떨어지고, 앞뒤로 여유 시간을 둬서 잡으러 갈 수 있게 함
+      if (game.nextCatch) {
+        spawnCatch();
+        game.nextCatch = false;
+        game.toSpawn--;
+        game.spawnTimer = game.interval * 1.6;
+      } else if (game.wave >= game.mode.catchFrom && Math.random() < game.mode.catchChance) {
+        game.nextCatch = true;
+        game.spawnTimer = game.interval * 0.8;
+      } else {
+        spawnGroup();
+        game.toSpawn--;
+        game.spawnTimer = game.interval;
+      }
+    }
+  }
+
+  for (let i = tiles.length - 1; i >= 0; i--) {
+    const t = tiles[i];
+    const type = TILE_TYPES[t.type];
+    if (hits(t)) {
+      if (type.kind === 'avoid') { endGame(false, '하얀색 타일에 부딪혔어요.'); return; }
+      if (type.kind === 'catch') doFlash(true);
+      if (type.onCatch) type.onCatch();
+      tiles.splice(i, 1);
+    } else if (type.kind === 'catch' && missed(t)) {
+      endGame(false, '반투명 타일을 놓쳤어요.'); return;
+    } else if (t.y - t.h / 2 > H) {
+      tiles.splice(i, 1);
+    }
+  }
+
+  // 웨이브 클리어
+  if (game.pause <= 0 && game.toSpawn === 0 && tiles.length === 0) {
+    if (game.wave >= game.totalWaves) endGame(true);
+    else startWave(game.wave + 1);
+  }
+}
+
+let lastMode = null;
+function endGame(win, reason = '') {
+  state = 'result';
+  if (!win) doFlash(false);
+  hideGameUI();
+  let text;
+  if (win) {
+    text = `${game.totalWaves}웨이브를 모두 버텨냈어요!`;
+    if (game.mode.id === 'normal' && !normalCleared) {
+      normalCleared = true;
+      save('dodgeNormalCleared', true);
+      text += ' 🔓 하드 모드가 열렸어요!';
+    }
+  } else if (game.totalWaves === Infinity) {
+    const reached = game.wave - 1;               // 완전히 버틴 웨이브 수
+    const isBest = reached > endlessBest;
+    if (isBest) { endlessBest = reached; save('dodgeEndlessBest', endlessBest); }
+    text = `WAVE ${game.wave}에서 ${reason} ${reached}웨이브 버텼어요!` + (isBest ? ' 🏆 최고 기록!' : ` (최고 기록: ${endlessBest})`);
+  } else {
+    text = `WAVE ${game.wave} / ${game.totalWaves} 에서 ${reason}`;
+  }
+  $('resultTitle').textContent = win ? '클리어! 🎉' : 'GAME OVER';
+  $('resultText').textContent = text;
+  showScreen('result');
+}
+
+/* ---------- 홈 화면 버튼 ---------- */
+function buildModes() {
+  const box = $('modes');
+  box.innerHTML = '';
+  for (const m of MODES) {
+    const locked = m.locked && m.locked();
+    const b = document.createElement('button');
+    b.className = 'btn mode-card' + (locked ? ' locked' : '');
+    b.disabled = locked;
+    b.innerHTML = locked
+      ? `<div class="name">🔒 ${m.name}</div><div class="desc">${m.lockText}</div>`
+      : `<div class="name">${m.name}</div><div class="desc">${m.desc}</div>`;
+    b.onclick = () => { lastMode = m; startMode(m); };
+    box.appendChild(b);
+  }
+}
+
+/* ---------- 설정 화면 ---------- */
+function renderSettings() {
+  const box = $('keySlots');
+  box.innerHTML = '';
+  keys.forEach((k, i) => {
+    const b = document.createElement('button');
+    b.className = 'btn key-slot' + (waitingSlot === i ? ' waiting' : '');
+    b.innerHTML = `<div class="lane">${LANE_NAMES[i]}</div><div class="key">${waitingSlot === i ? '?' : keyLabel(k)}</div>`;
+    b.onclick = () => { waitingSlot = i; renderSettings(); };
+    box.appendChild(b);
+  });
+  $('settingsGuide').textContent = waitingSlot >= 0
+    ? `'${LANE_NAMES[waitingSlot]}' 칸에 쓸 키를 누르세요 (Esc: 취소)`
+    : '바꾸고 싶은 칸을 클릭한 뒤 새 키를 누르세요';
+}
+function openSettings() {
+  state = 'settings';
+  waitingSlot = -1;
+  renderSettings();
+  showScreen('settings');
+}
+$('settingsBtn').onclick = openSettings;
+$('settingsBackBtn').onclick = goHome;
+$('resetKeysBtn').onclick = () => { keys = DEFAULT_KEYS.slice(); saveKeys(); waitingSlot = -1; renderSettings(); };
+
+$('replayTutBtn').onclick = startTutorial;
+$('skipBtn').onclick = goHome;
+$('exitBtn').onclick = goHome;
+$('homeBtn').onclick = goHome;
+$('retryBtn').onclick = () => { if (lastMode) startMode(lastMode); };
+
+/* ---------- 시작: 튜토리얼부터 ---------- */
+resize();
+buildModes();
+startTutorial();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
