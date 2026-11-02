@@ -167,8 +167,8 @@ const MODES = [
     id: 'normal', name: '일반 모드', desc: '총 20웨이브', totalWaves: 20, catchFrom: 5, catchChance: 0.15,
     wave(n) {
       const k = (n - 1) / 19;                       // 0 → 1
-      return { count: 6 + n, interval: 0.6 - k * 0.3, speed: H * (0.65 + k * 0.8),
-               maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
+      return { count: 6 + n, interval: 0.75 - k * 0.3, speed: H * (0.5 + k * 0.4),
+               maxAtOnce: n < 4 ? 1 : n < 12 ? 2 : 3 };
     }
   },
   {
@@ -176,7 +176,7 @@ const MODES = [
     locked: () => !normalCleared, lockText: '일반 모드를 클리어하면 열려요',
     wave(n) {
       const k = (n - 1) / 19;
-      return { count: 8 + n, interval: 0.5 - k * 0.28, speed: H * (0.85 + k * 0.9),
+      return { count: 8 + n, interval: 0.6 - k * 0.25, speed: H * (0.65 + k * 0.45),
                maxAtOnce: n < 3 ? 2 : 3 };
     }
   },
@@ -185,8 +185,8 @@ const MODES = [
     wave(n) {
       // 20웨이브까지는 일반 모드와 같고, 그 뒤로는 천천히 계속 어려워짐 (상한 있음)
       const k = n <= 20 ? (n - 1) / 19 : Math.min(1.6, 1 + (n - 20) * 0.03);
-      return { count: 6 + Math.min(n, 30), interval: Math.max(0.2, 0.6 - k * 0.3), speed: H * (0.65 + k * 0.8),
-               maxAtOnce: n < 4 ? 1 : n < 10 ? 2 : 3 };
+      return { count: 6 + Math.min(n, 30), interval: Math.max(0.35, 0.75 - k * 0.3), speed: H * (0.5 + Math.min(k, 1.5) * 0.4),
+               maxAtOnce: n < 4 ? 1 : n < 12 ? 2 : 3 };
     }
   }
 ];
@@ -550,6 +550,9 @@ function updateTutorial(dt) {
      interval  생성 간격(초)
      speed     낙하 속도(px/s)
      maxAtOnce 동시에 떨어지는 최대 개수 (항상 1칸은 비움)
+   속도는 화면 높이에 비례 → 타일이 보이고 나서 플레이어에 닿기까지 최소 약 0.8초.
+   직전 줄에서 비어 있던 칸마다, 다음 줄에도 한 칸 이내에 빈 칸을 남겨서
+   '한 줄에 최대 한 칸 이동'으로 항상 피할 수 있게 만듦 (사람이 깰 수 있도록).
    ========================================================= */
 const game = { mode: null, wave: 0, totalWaves: 20, toSpawn: 0, spawnTimer: 0, interval: 1, speed: 300, pause: 0 };
 
@@ -583,15 +586,31 @@ function startMode(mode) {
   startWave(1);
 }
 
+const near = l => [l - 1, l, l + 1].filter(x => x >= 0 && x < LANES);
+// 직전 줄의 빈 칸들 (화면에 타일이 없으면 지금 플레이어 칸에서 시작)
+function prevFree() { return tiles.length === 0 ? [player.lane] : game.free; }
+
 function spawnCatch() {
   const catchTypes = typesOfKind('catch');
-  spawnTile(pickLanes(1)[0], catchTypes[Math.floor(Math.random() * catchTypes.length)], game.speed);
+  // 직전 줄의 모든 빈 칸에서 한 칸 이내인 칸을 고름 (없으면 플레이어 근처)
+  const free = prevFree();
+  let opts = [0, 1, 2, 3].filter(l => free.every(f => Math.abs(f - l) <= 1));
+  if (!opts.length) opts = near(player.lane);
+  const lane = opts[Math.floor(Math.random() * opts.length)];
+  spawnTile(lane, catchTypes[Math.floor(Math.random() * catchTypes.length)], game.speed);
+  game.free = [lane];
 }
 
 function spawnGroup() {
   const avoidTypes = typesOfKind('avoid');
   const n = 1 + Math.floor(Math.random() * game.maxAtOnce);
-  for (const l of pickLanes(n)) spawnTile(l, avoidTypes[Math.floor(Math.random() * avoidTypes.length)], game.speed);
+  const blocked = new Set(pickLanes(n));
+  // 직전 줄의 빈 칸에서 한 칸 안에 빈 칸이 하나도 없으면 그 칸을 비워 줌
+  for (const f of prevFree()) {
+    if (near(f).every(l => blocked.has(l))) blocked.delete(f);
+  }
+  for (const l of blocked) spawnTile(l, avoidTypes[Math.floor(Math.random() * avoidTypes.length)], game.speed);
+  game.free = [0, 1, 2, 3].filter(l => !blocked.has(l));
 }
 
 function updateGame(dt) {
@@ -607,7 +626,7 @@ function updateGame(dt) {
         game.spawnTimer = game.interval * 1.6;
       } else if (game.wave >= game.mode.catchFrom && Math.random() < game.mode.catchChance) {
         game.nextCatch = true;
-        game.spawnTimer = game.interval * 0.8;
+        game.spawnTimer = game.interval * 1.2;
       } else {
         spawnGroup();
         game.toSpawn--;
