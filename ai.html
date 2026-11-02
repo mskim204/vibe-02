@@ -24,6 +24,7 @@
   .assistant { background: #eef0f7; }
   .error { background: #fde8e8; color: #b91c1c; }
   .thinking { color: #888; font-style: italic; }
+  .time { font-size: 12px; color: #888; margin: -4px 0 10px 4px; }
   .empty { color: #999; text-align: center; margin-top: 120px; }
   form { display: flex; gap: 8px; }
   textarea { flex: 1; font-size: 16px; padding: 10px; border: 1px solid #ccc; border-radius: 10px; resize: vertical; min-height: 48px; font-family: inherit; }
@@ -80,8 +81,13 @@
   async function ask(question) {
     history.push({ role: "user", content: question });
     addBubble(question, "user");
-    const thinking = addBubble("생각 중…", "assistant thinking");
+    const thinking = addBubble("생각 중… 0초", "assistant thinking");
     sendBtn.disabled = true;
+
+    // 답이 오는 데 걸린 시간 재기 (기다리는 동안 초가 올라감)
+    const start = performance.now();
+    const seconds = () => ((performance.now() - start) / 1000).toFixed(1);
+    const ticker = setInterval(() => { thinking.textContent = "생각 중… " + Math.floor((performance.now() - start) / 1000) + "초"; }, 1000);
 
     try {
       const res = await fetch(SERVER_URL, {
@@ -107,6 +113,11 @@
       thinking.textContent = "⚠️ 오류: " + err.message;
       thinking.className = "msg error";
     } finally {
+      clearInterval(ticker);
+      const time = document.createElement("div");
+      time.className = "time";
+      time.textContent = "⏱ " + seconds() + "초 걸렸어요";
+      thinking.after(time);
       sendBtn.disabled = false;
       input.focus();
     }
