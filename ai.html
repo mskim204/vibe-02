@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 질문하기</title>
+<script>
+  // ===== 설정 (여기만 바꾸면 돼요) =====
+  const SERVER_URL = "https://script.google.com/macros/s/AKfycbw5e2VaJzlwoMKoy-X5Tk4jKBKYJllw1LC99mnAsaYtsbB1A3YOgc-uUL1yd4CCuAUmvg/exec";
+  const CLASS_CODE = "vibe7128";
+  const SYSTEM_PROMPT = "너는 친절한 선생님이야. 학생 눈높이에 맞춰 쉽고 짧게 한국어로 답해줘.";
+  const MAX_MESSAGES = 10; // 최근 몇 개의 메시지까지 보낼지
+  // ====================================
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: sans-serif; background: #f4f5fb; color: #222; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  #chat { margin: 16px 0; min-height: 300px; background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .msg { margin: 10px 0; padding: 10px 14px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
+  .user { background: #4f46e5; color: #fff; margin-left: auto; }
+  .assistant { background: #eef0f7; }
+  .error { background: #fde8e8; color: #b91c1c; }
+  .thinking { color: #888; font-style: italic; }
+  .time { font-size: 12px; color: #888; margin: -4px 0 10px 4px; }
+  .empty { color: #999; text-align: center; margin-top: 120px; }
+  form { display: flex; gap: 8px; }
+  textarea { flex: 1; font-size: 16px; padding: 10px; border: 1px solid #ccc; border-radius: 10px; resize: vertical; min-height: 48px; font-family: inherit; }
+  button { font-size: 16px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; }
+  button:disabled { background: #a5a3e8; cursor: wait; }
+  #newChat { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; padding: 8px 14px; font-size: 14px; }
+  .hint { font-size: 13px; color: #888; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🤖 AI 질문하기</h1>
+    <button id="newChat" type="button">새 대화</button>
+  </header>
+
+  <div id="chat"><p class="empty">궁금한 것을 물어보세요!</p></div>
+
+  <form id="form">
+    <textarea id="input" placeholder="질문을 입력하세요 (Enter: 보내기, Shift+Enter: 줄바꿈)"></textarea>
+    <button id="send" type="submit">보내기</button>
+  </form>
+  <p class="hint">AI는 최근 대화 <span id="maxCount"></span>개까지 기억해요.</p>
+</div>
+
+<script>
+  const chat = document.getElementById("chat");
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const sendBtn = document.getElementById("send");
+  document.getElementById("maxCount").textContent = MAX_MESSAGES;
+
+  // 지금까지 나눈 대화 (순서대로) — AI의 '기억'
+  let history = [];
+
+  function addBubble(text, cls) {
+    const empty = chat.querySelector(".empty");
+    if (empty) empty.remove();
+    const div = document.createElement("div");
+    div.className = "msg " + cls;
+    div.textContent = text;
+    chat.appendChild(div);
+    div.scrollIntoView({ behavior: "smooth", block: "end" });
+    return div;
+  }
+
+  // 최근 MAX_MESSAGES개만, 그리고 첫 메시지는 반드시 user가 되도록
+  function recentMessages() {
+    let recent = history.slice(-MAX_MESSAGES);
+    while (recent.length && recent[0].role !== "user") recent = recent.slice(1);
+    return recent;
+  }
+
+  async function ask(question) {
+    history.push({ role: "user", content: question });
+    addBubble(question, "user");
+    const thinking = addBubble("생각 중… 0초", "assistant thinking");
+    sendBtn.disabled = true;
+
+    // 답이 오는 데 걸린 시간 재기 (기다리는 동안 초가 올라감)
+    const start = performance.now();
+    const seconds = () => ((performance.now() - start) / 1000).toFixed(1);
+    const ticker = setInterval(() => { thinking.textContent = "생각 중… " + Math.floor((performance.now() - start) / 1000) + "초"; }, 1000);
+
+    try {
+      const res = await fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          code: CLASS_CODE,
+          system: SYSTEM_PROMPT,
+          messages: recentMessages()
+        })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        thinking.textContent = data.text;
+        thinking.className = "msg assistant";
+        history.push({ role: "assistant", content: data.text });
+      } else {
+        throw new Error(data.error || "알 수 없는 오류");
+      }
+    } catch (err) {
+      // 실패한 질문은 기억에서 빼기
+      history.pop();
+      thinking.textContent = "⚠️ 오류: " + err.message;
+      thinking.className = "msg error";
+    } finally {
+      clearInterval(ticker);
+      const time = document.createElement("div");
+      time.className = "time";
+      time.textContent = "⏱ " + seconds() + "초 걸렸어요";
+      thinking.after(time);
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    if (!q || sendBtn.disabled) return;
+    input.value = "";
+    ask(q);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+
+  document.getElementById("newChat").addEventListener("click", () => {
+    history = [];
+    chat.innerHTML = '<p class="empty">새 대화를 시작했어요. 궁금한 것을 물어보세요!</p>';
+    input.focus();
+  });
+</script>
+</body>
+</html>
