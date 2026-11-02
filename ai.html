@@ -8,7 +8,14 @@
   // ===== 설정 (여기만 바꾸면 돼요) =====
   const SERVER_URL = "https://script.google.com/macros/s/AKfycbw5e2VaJzlwoMKoy-X5Tk4jKBKYJllw1LC99mnAsaYtsbB1A3YOgc-uUL1yd4CCuAUmvg/exec";
   const CLASS_CODE = "vibe7128";
-  const SYSTEM_PROMPT = "너는 친절한 선생님이야. 학생 눈높이에 맞춰 쉽고 짧게 한국어로 답해줘.";
+  // AI 성격 목록: 버튼 이름(name)과 AI에게 보낼 성격(system)
+  const PERSONAS = [
+    { name: "📚 친절한 공부 도우미", system: "너는 친절한 공부 도우미야. 학생 눈높이에 맞춰 쉽고 다정하게 한국어로 설명해줘." },
+    { name: "💪 엄격한 체육 선생님", system: "너는 엄격한 체육 선생님이야. 짧게 말해. 한두 문장으로 단호하게 답해." },
+    { name: "📜 조선 시대 선비", system: "너는 조선 시대 선비야. 옛날 말투로 말해. '~하오', '~이니라' 같은 말투를 써." },
+    { name: "😏 말빨 좋은 건방이", system: "너는 싸가지 없고 말빨 좋은 성격이야. 툭툭 던지듯 비꼬며 재치 있게 말하지만, 욕설이나 상처 주는 말은 하지 말고 답은 정확하게 알려줘." }
+  ];
+  let SYSTEM_PROMPT = PERSONAS[0].system; // 처음 성격
   const MAX_MESSAGES = 10; // 최근 몇 개의 메시지까지 보낼지
   // ====================================
 </script>
@@ -31,6 +38,10 @@
   button { font-size: 16px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; }
   button:disabled { background: #a5a3e8; cursor: wait; }
   #newChat { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; padding: 8px 14px; font-size: 14px; }
+  #personas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .persona { background: #fff; color: #4f46e5; border: 1px solid #c7c5f3; padding: 8px 12px; font-size: 14px; }
+  .persona.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+  .notice { text-align: center; font-size: 13px; color: #888; margin: 8px 0; }
   .hint { font-size: 13px; color: #888; margin-top: 6px; }
 </style>
 </head>
@@ -40,6 +51,8 @@
     <h1>🤖 AI 질문하기</h1>
     <button id="newChat" type="button">새 대화</button>
   </header>
+
+  <div id="personas"></div>
 
   <div id="chat"><p class="empty">궁금한 것을 물어보세요!</p></div>
 
@@ -136,6 +149,30 @@
       e.preventDefault();
       form.requestSubmit();
     }
+  });
+
+  // 성격 고르기 버튼
+  const personaBox = document.getElementById("personas");
+  PERSONAS.forEach((p, i) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "persona" + (i === 0 ? " active" : "");
+    btn.textContent = p.name;
+    btn.addEventListener("click", () => {
+      if (SYSTEM_PROMPT === p.system) return;
+      SYSTEM_PROMPT = p.system;
+      personaBox.querySelectorAll(".persona").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const empty = chat.querySelector(".empty");
+      if (empty) empty.remove();
+      const note = document.createElement("p");
+      note.className = "notice";
+      note.textContent = "— AI 성격이 '" + p.name + "'(으)로 바뀌었어요 —";
+      chat.appendChild(note);
+      note.scrollIntoView({ behavior: "smooth", block: "end" });
+      input.focus();
+    });
+    personaBox.appendChild(btn);
   });
 
   document.getElementById("newChat").addEventListener("click", () => {
