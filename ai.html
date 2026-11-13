@@ -121,7 +121,7 @@
   </header>
   <p class="sub">시험 범위 내용을 붙여 넣으면 AI가 확인 퀴즈를 만들어 줘요.</p>
 
-  <form id="form" class="panel">
+  <div id="form" class="panel">
     <label for="input">시험 범위</label>
     <textarea id="input" placeholder="예) 광합성은 식물이 빛에너지를 이용해 이산화탄소와 물로 포도당을 만드는 과정이다. 엽록체에서 일어나며…"></textarea>
     <div class="row">
@@ -138,9 +138,9 @@
         </span>
         <span id="counter" class="counter"></span>
       </div>
-      <button id="send" type="submit">퀴즈 만들기</button>
+      <button id="send" type="button">퀴즈 만들기</button>
     </div>
-  </form>
+  </div>
 
   <div id="result"></div>
 </div>
@@ -286,8 +286,8 @@
     }
   }
 
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
+  // form 제출 대신 버튼 클릭 (미리보기 화면에서도 눌려요)
+  sendBtn.addEventListener("click", () => {
     const text = input.value.trim().slice(0, MAX_INPUT);
     if (!text || sendBtn.disabled) { if (!text) input.focus(); return; }
     makeQuiz({
