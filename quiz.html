@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 퀴즈</title>
+<script>
+  // ===== 설정 (여기만 바꾸면 돼요) =====
+  const SERVER_URL = "https://script.google.com/macros/s/AKfycbw5e2VaJzlwoMKoy-X5Tk4jKBKYJllw1LC99mnAsaYtsbB1A3YOgc-uUL1yd4CCuAUmvg/exec";
+  const CLASS_CODE = "vibe7128";
+  const QUESTION_COUNT = 5; // 문제 수
+  const SYSTEM_PROMPT = `너는 학생을 위한 퀴즈 출제 선생님이야.
+학생이 준 주제로 4지선다 문제 ${QUESTION_COUNT}개를 만들어.
+반드시 아래 모양의 JSON 배열로만 답해. 인사말, 설명, 코드블록 표시(\`\`\`)는 절대 쓰지 마.
+[{"문제":"문제 내용","보기":["보기1","보기2","보기3","보기4"],"정답":1}]
+- "보기"는 꼭 4개.
+- "정답"은 맞는 보기의 번호(1~4)인 숫자.
+- 문제는 한국어로, 정답이 하나만 맞도록 정확하게 만들어.`;
+  // ====================================
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: sans-serif; background: #f4f5fb; color: #222; }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 14px; }
+  .panel { background: #fff; border-radius: 14px; padding: 18px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 16px; }
+  form { display: flex; gap: 8px; }
+  input[type=text] { flex: 1; min-width: 0; font-size: 16px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; }
+  button { font-size: 16px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; font-family: inherit; }
+  button:disabled { background: #a5a3e8; cursor: default; }
+  .status { text-align: center; color: #888; padding: 24px 0; }
+  .error { background: #fde8e8; color: #b91c1c; border-radius: 12px; padding: 14px; }
+  .top { display: flex; justify-content: space-between; color: #666; font-size: 14px; margin-bottom: 10px; }
+  .q { font-size: 18px; line-height: 1.55; margin: 0 0 14px; font-weight: 600; white-space: pre-wrap; }
+  .choices { display: grid; gap: 8px; }
+  .choice { text-align: left; background: #fff; color: #222; border: 2px solid #e3e5ee; padding: 12px 14px; }
+  .choice:not(:disabled):hover { border-color: #4f46e5; }
+  .choice:disabled { cursor: default; background: #fff; }
+  .choice.correct { background: #dcfce7; border-color: #22c55e; font-weight: 600; }
+  .choice.wrong { background: #fee2e2; border-color: #ef4444; }
+  .result { margin-top: 14px; font-size: 17px; font-weight: 700; }
+  .result.ok { color: #16a34a; }
+  .result.no { color: #dc2626; }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .ghost { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; }
+  .final { text-align: center; }
+  .big { font-size: 40px; font-weight: 800; color: #4f46e5; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🧩 AI 퀴즈</h1>
+
+  <div class="panel">
+    <form id="form">
+      <input id="topic" type="text" placeholder="주제를 입력하세요 (예: 태양계, 조선 시대)">
+      <button id="make" type="submit">문제 만들기</button>
+    </form>
+  </div>
+
+  <div id="area"></div>
+</div>
+
+<script>
+  const form = document.getElementById("form");
+  const topicInput = document.getElementById("topic");
+  const makeBtn = document.getElementById("make");
+  const area = document.getElementById("area");
+
+  let questions = [];  // [{문제, 보기[4], 정답(1~4)}]
+  let current = 0;     // 지금 문제 번호 (0부터)
+  let score = 0;       // 맞힌 개수
+  let topic = "";
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // AI 답에서 JSON 배열 꺼내고 모양 검사
+  function parseQuestions(text) {
+    const t = String(text);
+    const a = t.indexOf("["), b = t.lastIndexOf("]");
+    if (a === -1 || b === -1) throw new Error("AI 답에서 JSON 배열을 찾을 수 없어요.");
+    const list = JSON.parse(t.slice(a, b + 1));
+    if (!Array.isArray(list) || !list.length) throw new Error("문제가 하나도 없어요.");
+    return list.map((q, i) => {
+      const 정답 = Number(q && q.정답);
+      if (!q || typeof q.문제 !== "string" || !Array.isArray(q.보기) || q.보기.length !== 4 || !(정답 >= 1 && 정답 <= 4))
+        throw new Error((i + 1) + "번 문제 모양이 이상해요.");
+      return { 문제: q.문제, 보기: q.보기.map(String), 정답 };
+    });
+  }
+
+  async function makeQuiz(t) {
+    topic = t;
+    makeBtn.disabled = true;
+    area.innerHTML = '<div class="panel status">생각 중…</div>';
+    try {
+      const res = await fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          code: CLASS_CODE,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: "주제: " + t }]
+        })
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "알 수 없는 오류");
+      questions = parseQuestions(data.text);
+      current = 0;
+      score = 0;
+      showQuestion();
+    } catch (err) {
+      area.innerHTML = '<div class="error">⚠️ 오류: ' + esc(err.message) + '</div>';
+    } finally {
+      makeBtn.disabled = false;
+    }
+  }
+
+  // 한 문제씩 보여 주기
+  function showQuestion() {
+    const q = questions[current];
+    area.innerHTML = `<div class="panel">
+      <div class="top"><span>${current + 1} / ${questions.length} 문제</span><span>점수: ${score}점</span></div>
+      <p class="q">${esc(q.문제)}</p>
+      <div class="choices">
+        ${q.보기.map((c, i) => `<button class="choice" type="button" data-n="${i + 1}">${i + 1}. ${esc(c)}</button>`).join("")}
+      </div>
+      <div id="result"></div>
+    </div>`;
+    area.querySelectorAll(".choice").forEach(btn => btn.addEventListener("click", () => choose(Number(btn.dataset.n))));
+  }
+
+  // 보기를 골랐을 때: 맞음/틀림 + 점수
+  function choose(n) {
+    const q = questions[current];
+    const ok = n === q.정답;
+    if (ok) score++;
+    area.querySelectorAll(".choice").forEach(btn => {
+      const k = Number(btn.dataset.n);
+      btn.disabled = true;
+      if (k === q.정답) btn.classList.add("correct");
+      else if (k === n) btn.classList.add("wrong");
+    });
+    area.querySelector(".top span:last-child").textContent = "점수: " + score + "점";
+    const last = current === questions.length - 1;
+    document.getElementById("result").innerHTML = `
+      <div class="result ${ok ? "ok" : "no"}">${ok ? "⭕ 맞았어요!" : "❌ 틀렸어요. 정답은 " + q.정답 + "번이에요."}</div>
+      <div class="actions"><button id="next" type="button">${last ? "결과 보기" : "다음 문제"}</button></div>`;
+    document.getElementById("next").addEventListener("click", () => {
+      if (last) showFinal();
+      else { current++; showQuestion(); }
+    });
+  }
+
+  // 끝: 최종 점수 + CSV 저장
+  function showFinal() {
+    area.innerHTML = `<div class="panel final">
+      <div>🎉 퀴즈 끝!</div>
+      <div class="big">${score} / ${questions.length}</div>
+      <div>${questions.length}문제 중 ${score}문제를 맞혔어요.</div>
+      <div class="actions" style="justify-content:center">
+        <button id="csv" type="button">CSV 저장</button>
+        <button id="again" class="ghost" type="button">같은 주제로 다시</button>
+      </div>
+    </div>`;
+    document.getElementById("csv").addEventListener("click", saveCSV);
+    document.getElementById("again").addEventListener("click", () => makeQuiz(topic));
+  }
+
+  // 문제.csv 내려받기 (엑셀 한글 깨짐 방지: 맨 앞에 BOM)
+  function saveCSV() {
+    const cell = (v) => '"' + String(v).replace(/"/g, '""') + '"';
+    const rows = [["문제", "보기1", "보기2", "보기3", "보기4", "정답"]];
+    questions.forEach(q => rows.push([q.문제, ...q.보기, q.정답]));
+    const csv = "﻿" + rows.map(r => r.map(cell).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "문제.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const t = topicInput.value.trim();
+    if (!t) { topicInput.focus(); return; }
+    if (!makeBtn.disabled) makeQuiz(t);
+  });
+</script>
+</body>
+</html>
