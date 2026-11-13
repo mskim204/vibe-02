@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 스무고개</title>
+<script>
+  // ===== 설정 (여기만 바꾸면 돼요) =====
+  const SERVER_URL = "https://script.google.com/macros/s/AKfycbw5e2VaJzlwoMKoy-X5Tk4jKBKYJllw1LC99mnAsaYtsbB1A3YOgc-uUL1yd4CCuAUmvg/exec";
+  const CLASS_CODE = "vibe7128";
+  const MAX_QUESTIONS = 20; // 질문 기회
+  // 게임마다 이 중 하나를 무작위로 골라 AI에게 알려 줘요
+  const TOPICS = ["동물", "음식", "과일", "채소", "직업", "탈것", "운동·스포츠", "학교 물건", "집 안 물건", "자연", "악기", "곤충", "바다 생물", "나라"];
+
+  // ① 단어 정하기: AI가 비밀 단어를 하나 고를 때
+  const PICK_PROMPT = `너는 스무고개 진행자야.
+학생이 준 주제 안에서 초등학생도 아는 단어(명사) 하나를 무작위로 골라.
+너무 뻔한 단어만 고르지 말고 매번 다양하게 골라.
+반드시 아래 JSON 모양으로만 답해. 다른 글이나 코드블록 표시(\`\`\`)는 쓰지 마.
+{"주제":"동물","정답":"기린"}`;
+
+  // ② 질문에 답하기: 비밀 단어를 알고 있는 AI가 예/아니오로 답할 때
+  const ANSWER_PROMPT = (topic, word) => `너는 스무고개 진행자야.
+주제: "${topic}"
+비밀 정답 단어: "${word}"
+정답 단어를 절대 먼저 말하지 마.
+학생의 질문에 정답 단어 기준으로 사실대로 답해.
+- "답"은 "예", "아니오", "애매해요" 중 하나.
+- 예/아니오로 답할 수 없는 질문이면 "답"을 "다시"로 해.
+- 학생이 정답 단어(또는 같은 뜻의 말)를 맞혔으면 "맞힘"을 true로 해.
+반드시 아래 JSON 모양으로만 답해. 다른 글이나 코드블록 표시(\`\`\`)는 쓰지 마.
+{"답":"예","맞힘":false}`;
+  // ====================================
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: sans-serif; background: #f4f5fb; color: #222; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  h1 { font-size: 22px; margin: 0; }
+  .panel { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-top: 14px; }
+  button { font-size: 16px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; font-family: inherit; }
+  button:disabled { background: #a5a3e8; cursor: default; }
+  .ghost { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; padding: 8px 14px; font-size: 14px; }
+  .ghost:disabled { background: #fff; color: #aaa; border-color: #ddd; }
+  .info { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .topic { font-size: 20px; font-weight: 800; }
+  .topic span { color: #4f46e5; }
+  .left { font-size: 15px; color: #555; }
+  .left b { color: #dc2626; font-size: 20px; }
+  .bar { height: 8px; background: #eef0f7; border-radius: 99px; margin-top: 10px; overflow: hidden; }
+  .bar div { height: 100%; background: #4f46e5; transition: width .3s; }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; font-size: 16px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; }
+  .hint { font-size: 13px; color: #888; margin: 8px 0 0; }
+  #log { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  #log li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 10px; background: #f7f7fb; }
+  #log .n { color: #888; margin-right: 6px; }
+  .a { font-weight: 700; white-space: nowrap; }
+  .a.예 { color: #16a34a; } .a.아니오 { color: #dc2626; } .a.애매해요 { color: #ca8a04; } .a.다시 { color: #888; }
+  .status { text-align: center; color: #888; padding: 10px 0; }
+  .error { background: #fde8e8; color: #b91c1c; border-radius: 12px; padding: 12px; margin-top: 10px; }
+  .end { text-align: center; font-size: 18px; }
+  .end .word { font-size: 32px; font-weight: 800; color: #4f46e5; margin: 6px 0 12px; }
+  .empty { color: #999; text-align: center; padding: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🤔 AI 스무고개</h1>
+    <button id="newGame" class="ghost" type="button">새 게임</button>
+  </header>
+
+  <div id="board"></div>
+</div>
+
+<script>
+  const board = document.getElementById("board");
+  const newBtn = document.getElementById("newGame");
+
+  let game = null; // { topic, word, count, log: [{q, a}], over }
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // 선생님 중계 서버로 보내기
+  async function askAI(system, content) {
+    let res;
+    try {
+      res = await fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ code: CLASS_CODE, system, messages: [{ role: "user", content }] })
+      });
+    } catch (err) {
+      throw new Error(err.message + " — 서버에 연결하지 못했어요. 인터넷 연결을 확인하고, 미리보기 화면이라면 파일을 내려받아 Chrome이나 Edge로 직접 열어 보세요.");
+    }
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "알 수 없는 오류");
+    return data.text;
+  }
+
+  // AI 답에서 JSON 꺼내기
+  function parseJSON(text) {
+    const t = String(text), a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if (a === -1 || b === -1) throw new Error("AI 답의 모양이 이상해요: " + t);
+    return JSON.parse(t.slice(a, b + 1));
+  }
+
+  const norm = (s) => String(s).replace(/[\s?.!~,'"]/g, "").toLowerCase();
+
+  // ----- 새 게임: AI가 비밀 단어 정하기 -----
+  async function startGame() {
+    newBtn.disabled = true;
+    game = null;
+    board.innerHTML = '<div class="panel status">AI가 단어를 정하는 중… 🤫</div>';
+    const topic = TOPICS[Math.floor(Math.random() * TOPICS.length)];
+    try {
+      const text = await askAI(PICK_PROMPT, `주제: ${topic}\n(무작위 번호: ${Math.floor(Math.random() * 100000)})`);
+      const data = parseJSON(text);
+      const word = String(data.정답 || "").trim();
+      if (!word) throw new Error("AI가 단어를 정하지 못했어요.");
+      game = { topic: String(data.주제 || topic), word, count: 0, log: [], over: false };
+      render();
+    } catch (err) {
+      board.innerHTML = '<div class="error">⚠️ 오류: ' + esc(err.message) + '</div>';
+    } finally {
+      newBtn.disabled = false;
+    }
+  }
+
+  // ----- 화면 그리기 -----
+  function render(extra = "") {
+    const left = MAX_QUESTIONS - game.count;
+    board.innerHTML = `
+      <div class="panel">
+        <div class="info">
+          <div class="topic">주제: <span>${esc(game.topic)}</span></div>
+          <div class="left">남은 질문 <b>${left}</b> / ${MAX_QUESTIONS}</div>
+        </div>
+        <div class="bar"><div style="width:${(game.count / MAX_QUESTIONS) * 100}%"></div></div>
+      </div>
+
+      ${game.over ? "" : `<div class="panel">
+        <div class="ask">
+          <input id="q" type="text" placeholder="예/아니오로 답할 질문이나 정답을 입력하세요">
+          <button id="send" type="button">질문하기</button>
+        </div>
+        <p class="hint">예) "다리가 4개야?", "물속에 살아?" · 정답을 알 것 같으면 "기린이야?"처럼 물어보세요.</p>
+        <div id="msg">${extra}</div>
+        <div style="text-align:right;margin-top:8px"><button id="giveUp" class="ghost" type="button">포기하고 정답 보기</button></div>
+      </div>`}
+
+      <div id="endBox"></div>
+
+      <div class="panel">
+        <ul id="log">${game.log.length
+          ? game.log.map((l, i) => `<li><span><span class="n">${l.counted ? l.no + "." : "·"}</span>${esc(l.q)}</span><span class="a ${esc(l.a)}">${esc(l.a === "다시" ? "예/아니오로 물어봐 주세요" : l.a)}</span></li>`).reverse().join("")
+          : '<li class="empty">아직 질문이 없어요. 첫 질문을 해 보세요!</li>'}</ul>
+      </div>`;
+
+    if (game.over) showEnd();
+    else {
+      const input = document.getElementById("q");
+      const send = document.getElementById("send");
+      send.addEventListener("click", ask);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); ask(); }
+      });
+      document.getElementById("giveUp").addEventListener("click", () => endGame(false, true));
+      input.focus();
+    }
+  }
+
+  // ----- 질문하기 -----
+  async function ask() {
+    const input = document.getElementById("q");
+    const send = document.getElementById("send");
+    const q = input.value.trim();
+    if (!q || send.disabled || game.over) return;
+    send.disabled = true;
+    input.disabled = true;
+    document.getElementById("msg").innerHTML = '<p class="status">생각 중…</p>';
+
+    try {
+      const data = parseJSON(await askAI(ANSWER_PROMPT(game.topic, game.word), q));
+      let a = ["예", "아니오", "애매해요", "다시"].includes(data.답) ? data.답 : "애매해요";
+      const won = data.맞힘 === true || norm(q).includes(norm(game.word));
+      if (won) a = "정답!";
+      const counted = a !== "다시";
+      if (counted) game.count++;
+      game.log.push({ q, a, counted, no: game.count });
+
+      if (won) endGame(true);
+      else if (game.count >= MAX_QUESTIONS) endGame(false);
+      else render();
+    } catch (err) {
+      send.disabled = false;
+      input.disabled = false;
+      document.getElementById("msg").innerHTML = '<div class="error">⚠️ 오류: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  // ----- 게임 끝 -----
+  function endGame(won, gaveUp = false) {
+    game.over = true;
+    game.won = won;
+    game.gaveUp = gaveUp;
+    render();
+  }
+
+  function showEnd() {
+    const title = game.won
+      ? `🎉 ${game.count}번 만에 맞혔어요!`
+      : game.gaveUp ? "😅 포기했어요. 정답은…" : `😢 ${MAX_QUESTIONS}번 안에 못 맞혔어요. 정답은…`;
+    document.getElementById("endBox").innerHTML = `
+      <div class="panel end">
+        <div>${title}</div>
+        <div class="word">${esc(game.word)}</div>
+        <button id="again" type="button">새 게임</button>
+      </div>`;
+    document.getElementById("again").addEventListener("click", startGame);
+  }
+
+  newBtn.addEventListener("click", startGame);
+  startGame();
+</script>
+</body>
+</html>
