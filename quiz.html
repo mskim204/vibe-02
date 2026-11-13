@@ -15,7 +15,8 @@
 [{"문제":"문제 내용","보기":["보기1","보기2","보기3","보기4"],"정답":1}]
 - "보기"는 꼭 4개.
 - "정답"은 맞는 보기의 번호(1~4)인 숫자.
-- 문제는 한국어로, 정답이 하나만 맞도록 정확하게 만들어.`;
+- 문제는 한국어로, 정답이 하나만 맞도록 정확하게 만들어.
+- 학생이 고른 난이도(쉬움/보통/어려움)에 맞춰 문제를 만들어.`;
   // ====================================
 </script>
 <style>
@@ -42,6 +43,11 @@
   .result.ok { color: #16a34a; }
   .result.no { color: #dc2626; }
   .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .levels { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 14px; color: #555; flex-wrap: wrap; }
+  .level { background: #fff; color: #555; border: 2px solid #e3e5ee; padding: 7px 16px; font-size: 15px; }
+  .level.active[data-level="쉬움"] { background: #dcfce7; border-color: #22c55e; color: #166534; font-weight: 700; }
+  .level.active[data-level="보통"] { background: #fef9c3; border-color: #eab308; color: #854d0e; font-weight: 700; }
+  .level.active[data-level="어려움"] { background: #fee2e2; border-color: #ef4444; color: #991b1b; font-weight: 700; }
   .ghost { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; }
   .final { text-align: center; }
   .big { font-size: 40px; font-weight: 800; color: #4f46e5; margin: 8px 0; }
@@ -56,6 +62,11 @@
       <input id="topic" type="text" placeholder="주제를 입력하세요 (예: 태양계, 조선 시대)">
       <button id="make" type="submit">문제 만들기</button>
     </form>
+    <div class="levels">난이도
+      <button class="level" type="button" data-level="쉬움">쉬움</button>
+      <button class="level active" type="button" data-level="보통">보통</button>
+      <button class="level" type="button" data-level="어려움">어려움</button>
+    </div>
   </div>
 
   <div id="area"></div>
@@ -65,6 +76,13 @@
   const form = document.getElementById("form");
   const topicInput = document.getElementById("topic");
   const makeBtn = document.getElementById("make");
+
+  // 난이도 고르기 버튼
+  let level = "보통";
+  document.querySelectorAll(".level").forEach(btn => btn.addEventListener("click", () => {
+    level = btn.dataset.level;
+    document.querySelectorAll(".level").forEach(b => b.classList.toggle("active", b === btn));
+  }));
   const area = document.getElementById("area");
 
   let questions = [];  // [{문제, 보기[4], 정답(1~4)}]
@@ -100,7 +118,7 @@
         body: JSON.stringify({
           code: CLASS_CODE,
           system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: "주제: " + t }]
+          messages: [{ role: "user", content: "주제: " + t + "\n난이도: " + level }]
         })
       });
       const data = await res.json();
