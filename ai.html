@@ -3,92 +3,258 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 질문하기</title>
+<title>시험 범위 퀴즈 출제기</title>
 <script>
+  // =====================================================
   // ===== 설정 (여기만 바꾸면 돼요) =====
+  // =====================================================
   const SERVER_URL = "https://script.google.com/macros/s/AKfycbw5e2VaJzlwoMKoy-X5Tk4jKBKYJllw1LC99mnAsaYtsbB1A3YOgc-uUL1yd4CCuAUmvg/exec";
   const CLASS_CODE = "vibe7128";
-  const SYSTEM_PROMPT = ""; // AI 성격 (비워 두면 성격 없음)
-  const MAX_MESSAGES = 10; // 최근 몇 개의 메시지까지 보낼지
-  // ====================================
+  const MAX_INPUT = 1000; // 입력 글자 수 제한
+
+  // ===== AI 성격 (system) — 세 부분으로 나눠서 직접 고칠 수 있어요 =====
+
+  // ① 역할: AI가 누구인지
+  const ROLE = `
+너는 중·고등학생을 위한 친절한 시험 출제 선생님이야.
+학생이 붙여 넣은 시험 범위(교과서 내용, 필기, 요약 등)를 읽고
+그 내용을 잘 이해했는지 확인할 수 있는 퀴즈를 만들어.
+`;
+
+  // ② 규칙: 꼭 지켜야 할 것들
+  const RULES = `
+- 반드시 학생이 준 시험 범위 안의 내용으로만 문제를 낸다. 범위 밖 지식은 쓰지 않는다.
+- 문제 수는 학생이 요청한 개수를 지킨다. (요청이 없으면 5문제)
+- 객관식(4지선다)과 단답형을 섞어서 낸다.
+- 객관식은 보기 4개, 정답은 보기 중 하나와 글자가 똑같아야 한다.
+- 해설은 1~2문장으로 짧고 쉽게 쓴다.
+- 난이도는 "쉬움", "보통", "어려움" 중 하나로 표시한다.
+- 시험 범위가 아닌 내용(잡담, 질문 등)이 오면 questions를 빈 배열로 두고 title에 이유를 적는다.
+- JSON 말고 다른 글(인사말, 설명, 코드블록 표시 \`\`\`)은 절대 쓰지 않는다.
+`;
+
+  // ③ 답 모양: AI가 돌려줄 JSON 형식
+  const FORMAT = `
+아래 JSON 모양 그대로만 답해.
+{
+  "title": "퀴즈 제목 (예: 광합성 단원 확인 퀴즈)",
+  "questions": [
+    {
+      "type": "객관식",
+      "difficulty": "보통",
+      "question": "문제 내용",
+      "choices": ["보기1", "보기2", "보기3", "보기4"],
+      "answer": "보기2",
+      "explanation": "해설"
+    },
+    {
+      "type": "단답형",
+      "difficulty": "쉬움",
+      "question": "문제 내용",
+      "choices": [],
+      "answer": "정답",
+      "explanation": "해설"
+    }
+  ]
+}
+`;
+
+  // 위 세 부분을 합쳐서 AI에게 보내요 (건드리지 않아도 돼요)
+  const SYSTEM_PROMPT = `# 역할\n${ROLE.trim()}\n\n# 규칙\n${RULES.trim()}\n\n# 답 모양\n${FORMAT.trim()}`;
+  // =====================================================
 </script>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: sans-serif; background: #f4f5fb; color: #222; }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  body { margin: 0; font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; background: #f4f5fb; color: #222; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   h1 { font-size: 22px; margin: 0; }
-  #chat { margin: 16px 0; min-height: 300px; background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-  .msg { margin: 10px 0; padding: 10px 14px; border-radius: 12px; max-width: 85%; white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
-  .user { background: #4f46e5; color: #fff; margin-left: auto; }
-  .assistant { background: #eef0f7; }
-  .error { background: #fde8e8; color: #b91c1c; }
-  .thinking { color: #888; font-style: italic; }
-  .time { font-size: 12px; color: #888; margin: -4px 0 10px 4px; }
-  .empty { color: #999; text-align: center; margin-top: 120px; }
-  form { display: flex; gap: 8px; }
-  textarea { flex: 1; font-size: 16px; padding: 10px; border: 1px solid #ccc; border-radius: 10px; resize: vertical; min-height: 48px; font-family: inherit; }
-  button { font-size: 16px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; }
+  .sub { color: #666; font-size: 14px; margin: 4px 0 16px; }
+
+  .panel { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; }
+  textarea { width: 100%; font-size: 15px; padding: 12px; border: 1px solid #ccc; border-radius: 10px; resize: vertical; min-height: 160px; font-family: inherit; line-height: 1.5; }
+  textarea:focus { outline: 2px solid #c7c5f7; border-color: #4f46e5; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .opts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+  select { font-size: 14px; padding: 6px 8px; border-radius: 8px; border: 1px solid #ccc; }
+  .counter { font-size: 13px; color: #888; }
+  .counter.full { color: #dc2626; font-weight: 700; }
+
+  button { font-size: 15px; padding: 10px 18px; border: 0; border-radius: 10px; cursor: pointer; background: #4f46e5; color: #fff; font-family: inherit; }
   button:disabled { background: #a5a3e8; cursor: wait; }
-  #newChat { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; padding: 8px 14px; font-size: 14px; }
-  .hint { font-size: 13px; color: #888; margin-top: 6px; }
+  .ghost { background: #fff; color: #4f46e5; border: 1px solid #4f46e5; padding: 7px 12px; font-size: 13px; }
+
+  #result { margin-top: 20px; }
+  .status { text-align: center; color: #888; padding: 30px 0; }
+  .error-box { background: #fde8e8; color: #b91c1c; border-radius: 12px; padding: 16px; }
+  .error-box pre { background: #fff; color: #444; padding: 10px; border-radius: 8px; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+  .retry { background: #dc2626; margin-top: 8px; }
+  .time { font-size: 12px; color: #888; text-align: right; margin-top: 6px; }
+
+  .quiz-title { font-size: 19px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-left: 5px solid #4f46e5; }
+  .card-head { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  .num { font-weight: 800; color: #4f46e5; margin-right: 4px; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #eef0f7; color: #555; }
+  .tag.쉬움 { background: #dcfce7; color: #166534; }
+  .tag.보통 { background: #fef9c3; color: #854d0e; }
+  .tag.어려움 { background: #fee2e2; color: #991b1b; }
+  .q { font-size: 16px; line-height: 1.55; margin: 0 0 10px; white-space: pre-wrap; }
+  .choices { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 6px; }
+  .choices li { padding: 8px 12px; border: 1px solid #e3e5ee; border-radius: 8px; }
+  .card.show .choices li.correct { background: #dcfce7; border-color: #22c55e; font-weight: 600; }
+  .answer { display: none; background: #f5f6fb; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.5; }
+  .card.show .answer { display: block; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); font-size: 14px; }
+  th, td { padding: 9px 10px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  th { background: #4f46e5; color: #fff; font-weight: 600; }
+  h3 { margin: 24px 0 10px; font-size: 16px; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>🤖 AI 질문하기</h1>
-    <button id="newChat" type="button">새 대화</button>
+    <h1>📝 시험 범위 퀴즈 출제기</h1>
+    <button id="clear" class="ghost" type="button">새로 하기</button>
   </header>
+  <p class="sub">시험 범위 내용을 붙여 넣으면 AI가 확인 퀴즈를 만들어 줘요.</p>
 
-  <div id="chat"><p class="empty">궁금한 것을 물어보세요!</p></div>
-
-  <form id="form">
-    <textarea id="input" placeholder="질문을 입력하세요 (Enter: 보내기, Shift+Enter: 줄바꿈)"></textarea>
-    <button id="send" type="submit">보내기</button>
+  <form id="form" class="panel">
+    <label for="input">시험 범위</label>
+    <textarea id="input" placeholder="예) 광합성은 식물이 빛에너지를 이용해 이산화탄소와 물로 포도당을 만드는 과정이다. 엽록체에서 일어나며…"></textarea>
+    <div class="row">
+      <div class="opts">
+        <span>문제 수
+          <select id="count">
+            <option>3</option><option selected>5</option><option>7</option><option>10</option>
+          </select>
+        </span>
+        <span>난이도
+          <select id="level">
+            <option>골고루</option><option>쉬움</option><option>보통</option><option>어려움</option>
+          </select>
+        </span>
+        <span id="counter" class="counter"></span>
+      </div>
+      <button id="send" type="submit">퀴즈 만들기</button>
+    </div>
   </form>
-  <p class="hint">AI는 최근 대화 <span id="maxCount"></span>개까지 기억해요.</p>
+
+  <div id="result"></div>
 </div>
 
 <script>
-  const chat = document.getElementById("chat");
   const form = document.getElementById("form");
   const input = document.getElementById("input");
   const sendBtn = document.getElementById("send");
-  document.getElementById("maxCount").textContent = MAX_MESSAGES;
+  const counter = document.getElementById("counter");
+  const result = document.getElementById("result");
 
-  // 지금까지 나눈 대화 (순서대로) — AI의 '기억'
-  let history = [];
+  // ----- 입력 글자 수 제한 -----
+  input.maxLength = MAX_INPUT;
+  function updateCounter() {
+    if (input.value.length > MAX_INPUT) input.value = input.value.slice(0, MAX_INPUT); // 붙여넣기 대비
+    counter.textContent = input.value.length + " / " + MAX_INPUT + "자";
+    counter.classList.toggle("full", input.value.length >= MAX_INPUT);
+  }
+  input.addEventListener("input", updateCounter);
+  updateCounter();
 
-  function addBubble(text, cls) {
-    const empty = chat.querySelector(".empty");
-    if (empty) empty.remove();
-    const div = document.createElement("div");
-    div.className = "msg " + cls;
-    div.textContent = text;
-    chat.appendChild(div);
-    div.scrollIntoView({ behavior: "smooth", block: "end" });
-    return div;
+  // HTML 특수문자 막기 (AI 답을 안전하게 화면에 넣기)
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ----- AI 답(JSON) 꺼내기 + 모양 검사 -----
+  function parseQuiz(text) {
+    let t = String(text).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if (a === -1 || b === -1) throw new Error("JSON을 찾을 수 없어요.");
+    const data = JSON.parse(t.slice(a, b + 1));
+    if (typeof data.title !== "string") throw new Error("title이 없어요.");
+    if (!Array.isArray(data.questions)) throw new Error("questions 목록이 없어요.");
+    data.questions.forEach((q, i) => {
+      if (!q || typeof q.question !== "string" || q.answer == null)
+        throw new Error((i + 1) + "번 문제 모양이 이상해요.");
+      if (!Array.isArray(q.choices)) q.choices = [];
+    });
+    return data;
   }
 
-  // 최근 MAX_MESSAGES개만, 그리고 첫 메시지는 반드시 user가 되도록
-  function recentMessages() {
-    let recent = history.slice(-MAX_MESSAGES);
-    while (recent.length && recent[0].role !== "user") recent = recent.slice(1);
-    return recent;
+  // ----- 화면에 그리기: 카드 + 정답표 -----
+  function renderQuiz(data) {
+    if (!data.questions.length) {
+      result.innerHTML = `<div class="panel">🤔 ${esc(data.title || "문제를 만들 수 없었어요.")}</div>`;
+      return;
+    }
+    let html = `<h2 class="quiz-title"><span>${esc(data.title)}</span>
+      <button class="ghost" type="button" id="toggleAll">정답 모두 보기</button></h2>`;
+
+    data.questions.forEach((q, i) => {
+      const choices = q.choices.length
+        ? `<ul class="choices">${q.choices.map((c, j) =>
+            `<li class="${String(c).trim() === String(q.answer).trim() ? "correct" : ""}">${"①②③④⑤⑥"[j] || "•"} ${esc(c)}</li>`).join("")}</ul>`
+        : "";
+      html += `<div class="card">
+        <div class="card-head">
+          <span class="num">Q${i + 1}</span>
+          <span class="tag">${esc(q.type || "문제")}</span>
+          ${q.difficulty ? `<span class="tag ${esc(q.difficulty)}">${esc(q.difficulty)}</span>` : ""}
+        </div>
+        <p class="q">${esc(q.question)}</p>
+        ${choices}
+        <button class="ghost reveal" type="button">정답 보기</button>
+        <div class="answer" style="margin-top:8px">✅ <b>정답:</b> ${esc(q.answer)}<br>💡 ${esc(q.explanation || "")}</div>
+      </div>`;
+    });
+
+    html += `<h3>📋 정답표</h3><table>
+      <tr><th>번호</th><th>유형</th><th>정답</th><th>해설</th></tr>
+      ${data.questions.map((q, i) =>
+        `<tr><td>${i + 1}</td><td>${esc(q.type || "")}</td><td><b>${esc(q.answer)}</b></td><td>${esc(q.explanation || "")}</td></tr>`).join("")}
+    </table>`;
+    result.innerHTML = html;
+
+    result.querySelectorAll(".reveal").forEach(btn => btn.addEventListener("click", () => {
+      const card = btn.closest(".card");
+      card.classList.toggle("show");
+      btn.textContent = card.classList.contains("show") ? "정답 숨기기" : "정답 보기";
+    }));
+    document.getElementById("toggleAll").addEventListener("click", (e) => {
+      const cards = result.querySelectorAll(".card");
+      const showAll = ![...cards].every(c => c.classList.contains("show"));
+      cards.forEach(c => c.classList.toggle("show", showAll));
+      result.querySelectorAll(".reveal").forEach(b => b.textContent = showAll ? "정답 숨기기" : "정답 보기");
+      e.target.textContent = showAll ? "정답 모두 숨기기" : "정답 모두 보기";
+    });
   }
 
-  async function ask(question) {
-    history.push({ role: "user", content: question });
-    addBubble(question, "user");
-    const thinking = addBubble("생각 중… 0초", "assistant thinking");
+  // ----- 오류 + '다시 시도' 버튼 -----
+  function renderError(message, raw, retryFn) {
+    result.innerHTML = `<div class="error-box">
+      ⚠️ <b>${esc(message)}</b>
+      ${raw ? `<p style="margin:8px 0 4px;font-size:13px">AI가 보낸 답:</p><pre>${esc(raw)}</pre>` : ""}
+      <button class="retry" type="button">🔄 다시 시도</button>
+    </div>`;
+    result.querySelector(".retry").addEventListener("click", retryFn);
+  }
+
+  // ----- AI에게 요청 -----
+  let lastRequest = null;
+
+  async function makeQuiz(req) {
+    lastRequest = req;
     sendBtn.disabled = true;
-
-    // 답이 오는 데 걸린 시간 재기 (기다리는 동안 초가 올라감)
     const start = performance.now();
-    const seconds = () => ((performance.now() - start) / 1000).toFixed(1);
-    const ticker = setInterval(() => { thinking.textContent = "생각 중… " + Math.floor((performance.now() - start) / 1000) + "초"; }, 1000);
+    const sec = () => ((performance.now() - start) / 1000).toFixed(1);
+    result.innerHTML = `<div class="status">✏️ 문제 만드는 중… <span id="tick">0</span>초</div>`;
+    const ticker = setInterval(() => {
+      const t = document.getElementById("tick");
+      if (t) t.textContent = Math.floor((performance.now() - start) / 1000);
+    }, 1000);
 
+    const userMsg = `문제 수: ${req.count}개\n난이도: ${req.level}\n\n[시험 범위]\n${req.text}`;
+    let raw = "";
     try {
       const res = await fetch(SERVER_URL, {
         method: "POST",
@@ -96,51 +262,45 @@
         body: JSON.stringify({
           code: CLASS_CODE,
           system: SYSTEM_PROMPT,
-          messages: recentMessages()
+          messages: [{ role: "user", content: userMsg }]
         })
       });
       const data = await res.json();
-      if (data.ok) {
-        thinking.textContent = data.text;
-        thinking.className = "msg assistant";
-        history.push({ role: "assistant", content: data.text });
-      } else {
-        throw new Error(data.error || "알 수 없는 오류");
-      }
+      if (!data.ok) throw new Error(data.error || "알 수 없는 오류");
+      raw = data.text;
+
+      let quiz;
+      try { quiz = parseQuiz(raw); }
+      catch (e) { renderError("AI 답의 모양이 깨져서 왔어요. (" + e.message + ")", raw, () => makeQuiz(lastRequest)); return; }
+
+      renderQuiz(quiz);
     } catch (err) {
-      // 실패한 질문은 기억에서 빼기
-      history.pop();
-      thinking.textContent = "⚠️ 오류: " + err.message;
-      thinking.className = "msg error";
+      renderError("오류: " + err.message, raw, () => makeQuiz(lastRequest));
     } finally {
       clearInterval(ticker);
       const time = document.createElement("div");
       time.className = "time";
-      time.textContent = "⏱ " + seconds() + "초 걸렸어요";
-      thinking.after(time);
+      time.textContent = "⏱ " + sec() + "초 걸렸어요";
+      result.appendChild(time);
       sendBtn.disabled = false;
-      input.focus();
     }
   }
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const q = input.value.trim();
-    if (!q || sendBtn.disabled) return;
+    const text = input.value.trim().slice(0, MAX_INPUT);
+    if (!text || sendBtn.disabled) { if (!text) input.focus(); return; }
+    makeQuiz({
+      text,
+      count: document.getElementById("count").value,
+      level: document.getElementById("level").value
+    });
+  });
+
+  document.getElementById("clear").addEventListener("click", () => {
     input.value = "";
-    ask(q);
-  });
-
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      form.requestSubmit();
-    }
-  });
-
-  document.getElementById("newChat").addEventListener("click", () => {
-    history = [];
-    chat.innerHTML = '<p class="empty">새 대화를 시작했어요. 궁금한 것을 물어보세요!</p>';
+    updateCounter();
+    result.innerHTML = "";
     input.focus();
   });
 </script>
