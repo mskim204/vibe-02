@@ -127,7 +127,10 @@
       score = 0;
       showQuestion();
     } catch (err) {
-      area.innerHTML = '<div class="error">⚠️ 오류: ' + esc(err.message) + '</div>';
+      let msg = err.message;
+      if (err instanceof TypeError && /fetch/i.test(msg))
+        msg += " — 서버에 연결하지 못했어요. 인터넷 연결을 확인하고, 미리보기 화면이라면 파일을 내려받아 Chrome이나 Edge로 직접 열어 보세요.";
+      area.innerHTML = '<div class="error">⚠️ 오류: ' + esc(msg) + '</div>';
     } finally {
       makeBtn.disabled = false;
     }
