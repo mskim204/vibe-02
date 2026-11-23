@@ -126,6 +126,10 @@
   body.mobile #banner{font-size:16px;padding:8px 16px;top:22%;white-space:normal;max-width:80vw;text-align:center}
   #palette div{pointer-events:auto;cursor:pointer}
   #rotate{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(43,38,32,.85);color:#fff;font-size:20px;font-weight:900;text-align:center;padding:20px}
+  .sets{display:flex;gap:14px 26px;flex-wrap:wrap;justify-content:center;margin:4px 0 10px}
+  .sets label{display:flex;flex-direction:column;gap:4px;font-weight:800;font-size:14px;color:var(--muted);min-width:180px;text-align:left}
+  .sets label b{color:var(--ink)}
+  .sets input{accent-color:var(--orange);width:100%;height:26px}
   #loading{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:30;background:rgba(239,230,210,.92);font-size:22px;font-weight:900}
 </style>
 </head>
@@ -150,7 +154,7 @@
   <div id="touch">
     <div id="joy"><div id="joyKnob"></div></div>
     <div id="tbtns">
-      <button class="tb sm" data-act="view">시점</button><span></span>
+      <button class="tb sm" data-act="view">시점</button><button class="tb sm" data-act="rot">회전</button>
       <button class="tb" data-act="jump">점프</button><button class="tb big" data-act="act">변신</button>
     </div>
     <button id="tPause">II</button>
@@ -215,6 +219,10 @@
       <div><div class="label">숨는 시간</div><div class="opts" id="optHide"><button class="opt" data-v="45">45초</button><button class="opt sel" data-v="60">60초</button><button class="opt" data-v="90">90초</button></div></div>
       <div><div class="label">찾는 시간</div><div class="opts" id="optSeek"><button class="opt" data-v="150">150초</button><button class="opt sel" data-v="200">200초</button><button class="opt" data-v="260">260초</button></div></div>
     </div>
+    <div class="group"><div class="label">조작 설정</div><div class="sets">
+      <label>시점 감도 <b class="sensVal">1.0</b><input type="range" class="sensRange" min="0.3" max="2" step="0.1" value="1"></label>
+      <label>카메라 거리 <b class="camVal">보통</b><input type="range" class="camRange" min="1.2" max="5" step="0.1" value="3.2"></label>
+    </div></div>
     <div class="row"><button class="btn small" id="btnSetupBack">홈으로</button><button class="btn main small" id="btnStart">게임 시작</button></div>
   </div>
 </div>
@@ -231,11 +239,12 @@
     <p><b>승리 조건</b> — 찾는 시간이 끝났을 때 도망자가 한 명이라도 살아 있으면 도망자 승리, 모두 잡으면 찾는 사람 승리.</p>
     <p><b>패널티</b> — 진짜 사물을 잘못 확인하면 찾는 시간이 <b>10초</b> 줄어요. · <b>소리 힌트</b> — 20초마다 숨은 도망자 근처에서 소리가 나요.</p>
     <hr style="border:none;border-top:2px dashed var(--ink);opacity:.3">
-    <p>이동 — <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동, 마우스로 시점 회전, <kbd>Space</kbd> 점프, <kbd>Esc</kbd>/<kbd>P</kbd> 일시정지 (마우스 잠금이 안 되는 창에서는 마우스를 누른 채 끌어서 시점 회전)</p>
-    <p>도망자 — <kbd>F</kbd> 조준한 사물로 변신, <kbd>Q</kbd>/<kbd>E</kbd> 이 방의 사물 목록에서 바꾸기, <kbd>1</kbd>~<kbd>9</kbd> 바로 선택, <kbd>0</kbd> 사람으로. 숨은 뒤엔 <kbd>V</kbd>로 찾는 사람 시점 보기.</p>
+    <p>이동 — <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동, 마우스로 시점 회전, <kbd>Space</kbd> 점프, <kbd>Shift</kbd> 천천히 걷기(정밀 이동), 마우스 휠 카메라 거리, <kbd>Esc</kbd>/<kbd>P</kbd> 일시정지 (마우스 잠금이 안 되는 창에서는 마우스를 누른 채 끌어서 시점 회전)</p>
+    <p>도망자 — <kbd>F</kbd> 조준한 사물로 변신, <kbd>Q</kbd>/<kbd>E</kbd> 이 방의 사물 목록에서 바꾸기, <kbd>1</kbd>~<kbd>9</kbd> 바로 선택, <kbd>0</kbd> 사람으로, <kbd>R</kbd> 사물 방향 돌리기. 숨은 뒤엔 <kbd>V</kbd>로 찾는 사람 시점 보기.</p>
     <p>찾는 사람 — 조준점을 사물에 맞추고 <b>왼쪽 클릭</b>으로 확인 (가까이 있어야 해요)</p>
+    <p><b>조준 보조</b> — 조준점이 작은 사물 근처에만 있어도 자동으로 그 사물을 골라줘요. 시점 감도와 카메라 거리는 연습 대전 설정이나 일시정지 화면에서 바꿀 수 있어요.</p>
     <hr style="border:none;border-top:2px dashed var(--ink);opacity:.3">
-    <p><b>핸드폰</b> — 왼쪽 <b>조이스틱</b>으로 이동, 화면 오른쪽을 <b>끌어서</b> 시점 회전, <b>점프</b> 버튼. 도망자는 사물을 조준하고 <b>변신</b> 버튼, 또는 아래 사물 목록을 터치. 찾는 사람은 의심되는 사물을 <b>직접 터치</b>하거나 <b>확인</b> 버튼. 가로 화면을 추천해요.</p>
+    <p><b>핸드폰</b> — 왼쪽 <b>조이스틱</b>으로 이동, 화면 오른쪽을 <b>끌어서</b> 시점 회전, <b>점프</b> 버튼. 도망자는 사물을 조준하고 <b>변신</b> 버튼, 또는 아래 사물 목록을 터치, <b>회전</b> 버튼으로 방향 돌리기. 조이스틱을 살짝 밀면 천천히 걸어요. 찾는 사람은 의심되는 사물을 <b>직접 터치</b>하거나 <b>확인</b> 버튼. 가로 화면을 추천해요.</p>
     <div class="row"><button class="btn small" id="btnHowBack">홈으로</button></div>
   </div>
 </div>
@@ -243,6 +252,10 @@
 <div id="pause" class="screen overlay">
   <div class="panel" style="max-width:380px;text-align:center">
     <h2>일시정지</h2>
+    <div class="sets">
+      <label>시점 감도 <b class="sensVal">1.0</b><input type="range" class="sensRange" min="0.3" max="2" step="0.1" value="1"></label>
+      <label>카메라 거리 <b class="camVal">보통</b><input type="range" class="camRange" min="1.2" max="5" step="0.1" value="3.2"></label>
+    </div>
     <button class="btn main" id="btnResume">계속하기</button>
     <button class="btn" id="btnPauseHome">홈으로</button>
   </div>
@@ -1209,7 +1222,19 @@ function lockPointer(fromUser){
 // 마우스 잠금이 막힌 곳에서는 '드래그로 시점 회전' 모드로 진행
 function enterFreeMode(){if(noLock)return;noLock=true;lockPointer();if(G)tipMsg('마우스를 누른 채 끌면 시점 회전 · P 일시정지');}
 document.addEventListener('pointerlockerror',()=>{if(G&&lockFromUser)enterFreeMode();});
-function look(mx,my){G.yaw-=mx*0.0026;G.pitch=clamp(G.pitch-my*0.0026,-1.25,0.7);}
+let SENS=1,CAMD=3.2;
+try{SENS=clamp(Number(localStorage.getItem('hs_sens'))||1,0.3,2);CAMD=clamp(Number(localStorage.getItem('hs_cam'))||3.2,1.2,5);}catch(e){}
+function syncSettings(){
+  document.querySelectorAll('.sensRange').forEach(r=>r.value=SENS);document.querySelectorAll('.sensVal').forEach(b=>b.textContent=SENS.toFixed(1));
+  document.querySelectorAll('.camRange').forEach(r=>r.value=CAMD);document.querySelectorAll('.camVal').forEach(b=>b.textContent=CAMD<2?'가까이':CAMD>3.8?'멀리':'보통');
+  try{localStorage.setItem('hs_sens',SENS);localStorage.setItem('hs_cam',CAMD);}catch(e){}
+}
+document.querySelectorAll('.sensRange').forEach(r=>r.addEventListener('input',()=>{SENS=Number(r.value);syncSettings();}));
+document.querySelectorAll('.camRange').forEach(r=>r.addEventListener('input',()=>{CAMD=Number(r.value);syncSettings();}));
+syncSettings();
+// 마우스 휠로 카메라 거리 조절
+addEventListener('wheel',e=>{if(!G||G.paused||G.over)return;CAMD=clamp(CAMD+e.deltaY*0.002,1.2,5);syncSettings();},{passive:true});
+function look(mx,my){G.yaw-=mx*0.0026*SENS;G.pitch=clamp(G.pitch-my*0.0026*SENS,-1.25,0.7);}
 document.addEventListener('pointerlockchange',()=>{
   if(!G)return;const locked=document.pointerLockElement===canvas;
   document.getElementById('lockHint').style.display=locked||G.over?'none':'block';
@@ -1253,6 +1278,7 @@ function handleKey(code){
       if(code==='KeyQ')setDisguise(me,list[(Math.max(idx,0)-1+n)%n]);
       const dm=code.match(/^Digit([0-9])$/);if(dm&&Number(dm[1])<n)setDisguise(me,list[Number(dm[1])]);
     }
+    if(code==='KeyR'&&me.disg){me.drot+=PI/2;tone(880,.05,'triangle',.05);}
     if(code==='KeyF'){const o=aimTarget(true);let k=o&&o.isProp?o.k:(o&&o.hider&&o.disg?o.disg:null);
       if(!k){let bd=1e9;for(const p of entRoom(me).props){const d=Math.hypot(p.x-me.x,p.z-me.z)+Math.abs(p.y-me.y);if(d<bd){bd=d;k=p.k;}}}
       if(k)setDisguise(me,k);}
@@ -1286,7 +1312,7 @@ const lookEnd=e=>{if(!MOBILE||!G)return;for(const t of e.changedTouches)if(t.ide
 canvas.addEventListener('touchend',lookEnd);canvas.addEventListener('touchcancel',lookEnd);
 document.querySelectorAll('#tbtns .tb').forEach(b=>{
   b.addEventListener('touchstart',e=>{e.preventDefault();b.classList.add('on');if(!G||!G.started)return;const a=b.dataset.act;
-    if(a==='jump')handleKey('Space');else if(a==='view')handleKey('KeyV');
+    if(a==='jump')handleKey('Space');else if(a==='view')handleKey('KeyV');else if(a==='rot')handleKey('KeyR');
     else if(a==='act'){if(G.cfg.role==='seeker')seekerClick();else handleKey('KeyF');}},{passive:false});
   const off=()=>b.classList.remove('on');b.addEventListener('touchend',off);b.addEventListener('touchcancel',off);
 });
@@ -1297,6 +1323,7 @@ function updateTouchUI(){
   act.textContent=hider?'변신':'확인';act.classList.toggle('hide',!canAct);
   tb('jump').classList.toggle('hide',!playerCanMove());
   tb('view').classList.toggle('hide',!(hider&&(G.phase==='seek'||!me.alive)));
+  tb('rot').classList.toggle('hide',!(hider&&G.phase==='hide'&&me.alive&&me.disg));
   joyEl.style.visibility=playerCanMove()?'visible':'hidden';
 }
 function aimTarget(anyPhase,sx=0,sy=0){
@@ -1305,7 +1332,20 @@ function aimTarget(anyPhase,sx=0,sy=0){
   if(G.phase==='seek'||anyPhase)for(const h of G.hiders)if(h.alive&&h!==playerEnt())list.push(h.proxy);
   const f=floorOf(camera.position.y);list.push(...G.blockF[f],...G.slabs);
   const hits=raycaster.intersectObjects(list,false);
-  for(const hit of hits){const o=hit.object.userData.owner;return o&&(o.isProp||o.hider)?o:null;}
+  if(hits.length){const o=hits[0].object.userData.owner;if(o&&(o.isProp||o.hider))return o;}
+  // 조준 보조: 조준점 근처에 있는 사물을 대신 골라줘요 (작은 연필·컵도 쉽게)
+  const org=raycaster.ray.origin.clone(),dir=raycaster.ray.direction.clone(),cand=[];
+  const owners=[];for(const o of G.visRooms||[])for(const p of o.props)owners.push(p);
+  if(G.phase==='seek'||anyPhase)for(const h of G.hiders)if(h.alive&&h!==playerEnt())owners.push(h);
+  const c=new THREE.Vector3();
+  for(const o of owners){const b=objBox(o);c.set((b.x0+b.x1)/2,(b.y0+b.y1)/2,(b.z0+b.z1)/2);
+    const v=c.clone().sub(org),t=v.dot(dir);if(t<0.3||t>9)continue;
+    const perp=v.clone().addScaledVector(dir,-t).length(),size=Math.max(b.x1-b.x0,b.y1-b.y0,b.z1-b.z0)/2;
+    const lim=Math.max(0.12,t*0.045)+Math.min(size,0.25);if(perp<lim)cand.push({o,score:perp/t,d:v.length(),c:c.clone()});}
+  cand.sort((a,b)=>a.score-b.score);
+  const blockers=G.blockF[f].concat(G.slabs);
+  for(const k of cand.slice(0,3)){raycaster.set(org,k.c.clone().sub(org).normalize());raycaster.far=Math.max(0.1,k.d-0.35);
+    if(!raycaster.intersectObjects(blockers,false).length)return k.o;}
   return null;
 }
 function tipMsg(t){const el=document.getElementById('tip');el.textContent=t;el.style.display='block';G.tipT=1.4;}
@@ -1332,7 +1372,8 @@ function update(dt){
     const fx=clamp((keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+joy.x,-1,1),fz=clamp((keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-joy.y,-1,1);
     const sy=Math.sin(G.yaw),cy=Math.cos(G.yaw);let vx=-sy*fz+cy*fx,vz=-cy*fz-sy*fx;const l=Math.hypot(vx,vz);
     const spd=G.cfg.role==='seeker'?SEEKER_SPEED:HIDER_SPEED;
-    const amt=Math.min(1,l);if(l>0.08){vx/=l;vz/=l;me.face=Math.atan2(vx,vz);if(me.disg)me.drot=Math.round(me.face/(PI/2))*(PI/2);}else{vx=vz=0;}
+    let amt=Math.pow(Math.min(1,l),1.5);if(keys.ShiftLeft||keys.ShiftRight)amt*=0.4;if(me.disg)amt*=0.65;
+    if(l>0.08){vx/=l;vz/=l;me.face=Math.atan2(vx,vz);}else{vx=vz=0;}
     moveEnt(me,vx*spd*amt*dt,vz*spd*amt*dt,dt);me.moving=l>0.08;
   }
   if(G.cfg.role==='hider'&&G.phase==='hide'&&me.alive){const r=entRoom(me);if(r!==G.palRoom){G.palRoom=r;G.palette=[null,...r.types];updatePalette();}}
@@ -1456,12 +1497,15 @@ function updateCamera(){
   const lift=tgt.hider&&tgt.disg&&tgt.alive?Math.max(0.6,localBox(tgt.disg).y1*0.9):1.45;
   _t.set(tgt.x,tgt.y+lift,tgt.z);
   const cp=Math.cos(G.pitch),dir=new THREE.Vector3(Math.sin(G.yaw)*cp,-Math.sin(G.pitch),Math.cos(G.yaw)*cp);
-  let dist=3.2;const f=floorOf(tgt.y);
+  let dist=CAMD;const f=floorOf(tgt.y);
   raycaster.set(_t,dir);raycaster.far=dist;
   const hit=raycaster.intersectObjects(G.blockF[f].concat(G.slabs),false)[0];if(hit)dist=Math.max(0.3,hit.distance-0.25);
   _v.copy(_t).addScaledVector(dir,dist);_v.y=clamp(_v.y,f*FH+0.25,(f+1)*FH-SL-0.12);
   if(G.shake>0){_v.x+=rand(-.06,.06);_v.y+=rand(-.06,.06);}
   camera.position.copy(_v);camera.lookAt(_t);
+  // 카메라가 캐릭터에 너무 붙으면 내 캐릭터를 숨겨서 화면을 가리지 않게
+  G.seeker.model.visible=true;for(const h of G.hiders)h.model.visible=true;
+  if(_v.distanceTo(_t)<1.05)tgt.model.visible=false;
   const r=roomAt(f,tgt.x,tgt.z);roomLight.position.set(r.cx,(r.f+1)*FH-SL-0.5,r.cz);
 }
 function updatePalette(){
@@ -1484,8 +1528,8 @@ function updateHud(){
   document.getElementById('info').innerHTML=`<div class="r" style="color:${viewerHider?'#e8562a':INK}">${viewerHider?'나는 도망자':'나는 찾는 사람'}${viewerHider&&me.disg?' · '+TYPE_NAME[me.disg]:''}</div>
     ${G.m.name} · ${G.m.floorNames[r.f]} ${r.n}${me.y-r.f*FH>0.4?' · 높은 곳':''}<br>남은 도망자 ${alive}/${G.hiders.length} · 헛짚음 ${G.wrong}번 · ${G.cfg.mode}`;
   let help;
-  if(viewerHider)help=G.phase==='hide'?'WASD 이동 · Space 점프 · 사물 조준 후 F 변신 · Q/E 목록 바꾸기 · 0 사람으로':me.alive?'움직일 수 없어요 · 마우스로 둘러보기 · V 찾는 사람 시점':'관전 중 · V 시점 바꾸기';
-  else help=G.phase==='hide'?'WASD 이동 · Space 점프 · 어떤 사물이 어디 있는지 기억하세요 (아직 확인 불가)':`조준점으로 사물 클릭해서 확인 · 높은 곳은 점프 · 틀리면 -${PENALTY}초`;
+  if(viewerHider)help=G.phase==='hide'?'WASD 이동 · Shift 천천히 · Space 점프 · F 변신 · R 회전 · Q/E 목록 · 휠 카메라 거리':me.alive?'움직일 수 없어요 · 마우스로 둘러보기 · V 찾는 사람 시점':'관전 중 · V 시점 바꾸기';
+  else help=G.phase==='hide'?'WASD 이동 · Shift 천천히 · Space 점프 · 휠 카메라 거리 · 사물 위치를 기억하세요':`조준점으로 사물 클릭해서 확인 · 높은 곳은 점프 · 틀리면 -${PENALTY}초`;
   document.getElementById('help').textContent=help;updateTouchUI();checkRotate();
   document.getElementById('cross').style.display=G.cfg.role==='seeker'||G.phase==='hide'?'block':'none';
   document.getElementById('hideShade').style.display=G.phase==='hide'&&!viewerHider?'block':'none';
