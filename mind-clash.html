@@ -377,14 +377,14 @@ function drawStick(x, y, o = {}) {
     ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
     pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
   };
-  const LW = 11;
+  const LW = 7;
   const moving = o.moving && !o.air;
   const sw = moving ? Math.sin(o.walk || 0) : 0;
   const bob = moving ? -Math.abs(Math.cos(o.walk || 0)) * 3 : Math.sin((o.idle || 0) * 2.2) * 1;
   let lean = 0;
   if (o.pose === 'hit') lean = -f * 9 * Math.max(0, 1 - (o.poseT || 0) * 1.6);
   if (o.pose === 'slash') lean = f * 6 * Math.min(1, (o.poseT || 0) * 5);
-  const hipX = lean * 0.3, hipY = -40 + bob, neckX = lean, neckY = -72 + bob, headY = -92 + bob;
+  const hipX = lean * 0.3, hipY = -46 + bob, neckX = lean, neckY = -88 + bob, headY = -102 + bob;
   const shX = neckX, shY = neckY + 4;
   // 검 각도 (오른쪽 바라볼 때 기준, y 아래가 +)
   let sa = -0.75 + sw * 0.08;
@@ -397,23 +397,23 @@ function drawStick(x, y, o = {}) {
   else if (o.pose === 'ko') sa = 0.9;
   // 앞팔: 어깨 → 팔꿈치(아래로 꺾임) → 손
   const armA = clamp(sa, -1.9, 1.5) * 0.8 + 0.15;
-  const hand = [shX + Math.cos(armA) * 32 * f, shY + Math.sin(armA) * 32];
-  const elbow = [(shX + hand[0]) / 2 - f * 3, (shY + hand[1]) / 2 + 9];
+  const hand = [shX + Math.cos(armA) * 36 * f, shY + Math.sin(armA) * 36];
+  const elbow = [(shX + hand[0]) / 2 - f * 3, (shY + hand[1]) / 2 + 8];
   // 뒷팔 (어둡게)
   if (o.pose === 'win') L([[shX, shY], [shX - f * 14, shY - 14], [shX - f * 12, shY - 32]], LW, back);
-  else L([[shX, shY], [shX - f * 12 - sw * 6, shY + 16], [shX - f * 6 - sw * 8, shY + 30]], LW, back);
+  else L([[shX, shY], [shX - f * 12 - sw * 6, shY + 18], [shX - f * 6 - sw * 8, shY + 34]], LW, back);
   // 다리 (뒷다리 어둡게)
   if (o.air) {
-    L([[hipX, hipY], [hipX - f * 6, hipY + 20], [hipX - f * 16, hipY + 34]], LW, back);
-    L([[hipX, hipY], [hipX + f * 14, hipY + 17], [hipX + f * 4, hipY + 36]], LW, col);
+    L([[hipX, hipY], [hipX - f * 6, hipY + 23], [hipX - f * 16, hipY + 40]], LW, back);
+    L([[hipX, hipY], [hipX + f * 15, hipY + 20], [hipX + f * 4, hipY + 42]], LW, col);
   } else {
-    L([[hipX, hipY], [hipX + f * 2 + sw * 5, hipY + 20], [9 - sw * 14, -4]], LW, back);
-    L([[hipX, hipY], [hipX + f * 2 - sw * 5, hipY + 20], [-9 + sw * 14, -4]], LW, col);
+    L([[hipX, hipY], [hipX + f * 2 + sw * 5, hipY + 23], [9 - sw * 14, -3]], LW, back);
+    L([[hipX, hipY], [hipX + f * 2 - sw * 5, hipY + 23], [-9 + sw * 14, -3]], LW, col);
   }
   // 몸통
-  L([[hipX, hipY], [neckX, neckY]], LW + 2, col);
+  L([[hipX, hipY], [neckX, neckY]], LW + 1, col);
   // 머리: 꽉 찬 단색 원 (표정 없음)
-  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(lean + f * 1, headY, 17, 0, TAU); ctx.fill();
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(lean + f * 1, headY, 13, 0, TAU); ctx.fill();
   // 무기 + 앞팔
   if (o.weapon !== 'none') drawWeaponSprite(o.weapon || 'sword', hand[0], hand[1], f, sa, col);
   L([[shX, shY], elbow, hand], LW, col);
@@ -446,7 +446,7 @@ function drawWeaponSprite(id, hx, hy, f, sa) {
   }
   // 칼날: 굵고 각진 두 톤 (밝은 면 / 어두운 면)
   const gx = hx + dx * 6, gy = hy + dy * 6;
-  const bw = id === 'greatsword' ? 10 : 7.5;
+  const bw = id === 'greatsword' ? 8 : 5.5;
   const tx = gx + dx * len, ty = gy + dy * len;
   const half = (sgn, fill) => {
     ctx.beginPath();
@@ -456,8 +456,8 @@ function drawWeaponSprite(id, hx, hy, f, sa) {
   };
   half(1, '#c4ccd6'); half(-1, '#8e99a7');
   // 코등이
-  const gw = id === 'greatsword' ? 16 : 13;
-  ctx.strokeStyle = C.steelDark; ctx.lineWidth = 5;
+  const gw = id === 'greatsword' ? 13 : 10;
+  ctx.strokeStyle = C.steelDark; ctx.lineWidth = 4;
   ctx.beginPath(); ctx.moveTo(gx + px * gw, gy + py * gw); ctx.lineTo(gx - px * gw, gy - py * gw); ctx.stroke();
   ctx.restore();
 }
@@ -469,7 +469,7 @@ function drawMarker(x, y, color, label, alpha = 1, t = 0, scale = 1) {
   if (label) {
     ctx.font = font(13 * scale, 800);
     const tw = ctx.measureText(label).width + 16 * scale;
-    const ly = y - 122 * scale + Math.sin(t * 3) * 1.5;
+    const ly = y - 134 * scale + Math.sin(t * 3) * 1.5;
     ctx.fillStyle = color; rr(x - tw / 2, ly - 10 * scale, tw, 20 * scale, 6 * scale); ctx.fill();
     ctx.beginPath(); ctx.moveTo(x - 5, ly + 10 * scale); ctx.lineTo(x + 5, ly + 10 * scale); ctx.lineTo(x, ly + 15 * scale); ctx.closePath(); ctx.fill();
     text(label, x, ly + 1, 13 * scale, '#ffffff', 'center', 800);
@@ -836,7 +836,7 @@ function resolveClash() {
     target.hp = Math.max(0, target.hp - dmg);
     target.pose = 'hit'; target.poseT = 0; target.flash = 0.5; attacker.hits++;
     const sep = Math.abs(attacker.pos.x - target.pos.x) < 80 ? (target.isAI ? 32 : -32) : 0;
-    B.floaters.push({ x: target.pos.x + sep, y: target.pos.y - 140, text: `-${dmg}`, color: '#d62f2f', size: 42, t: 0, life: 1.9 });
+    B.floaters.push({ x: target.pos.x + sep, y: target.pos.y - 150, text: `-${dmg}`, color: '#d62f2f', size: 42, t: 0, life: 1.9 });
     for (let i = 0; i < 22; i++) {
       const a = rand(0, TAU), sp = rand(120, 380);
       B.particles.push({ x: target.pos.x, y: target.pos.y - 55, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, t: 0, life: rand(0.35, 0.75), color: Math.random() < 0.5 ? attacker.color : '#f0a500', size: rand(3, 6) });
@@ -972,8 +972,8 @@ function renderBattle() {
     ctx.globalAlpha = ghostAlpha;
     ctx.strokeStyle = 'rgba(214,69,69,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.ellipse(gp.x, gp.y, 24, 7, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-    text(B.ghost ? 'AI 잔상 (직전 턴)' : 'AI 시작 위치', gp.x, gp.y - 122, 12, '#b83a3a', 'center', 800);
-    if (plan) text('?', gp.x, gp.y - 142 + Math.sin(gt * 3) * 2, 20, '#b83a3a', 'center', 900);
+    text(B.ghost ? 'AI 잔상 (직전 턴)' : 'AI 시작 위치', gp.x, gp.y - 134, 12, '#b83a3a', 'center', 800);
+    if (plan) text('?', gp.x, gp.y - 154 + Math.sin(gt * 3) * 2, 20, '#b83a3a', 'center', 900);
     ctx.restore();
   }
 
@@ -1021,7 +1021,7 @@ function renderBattle() {
       drawSlashArc(f.pos, f.facing, f.tech, f.poseT / SWING_T, f.color);
   }
   if (plan) {   // 이동력 바 (머리 위)
-    const k = p.stamina / STAMINA, bx = p.pos.x - 30, by = p.pos.y - 146;
+    const k = p.stamina / STAMINA, bx = p.pos.x - 30, by = p.pos.y - 156;
     ctx.fillStyle = '#e3e7ed'; rr(bx, by, 60, 6, 3); ctx.fill();
     ctx.fillStyle = k < 0.15 ? '#e07b20' : C.p1; rr(bx, by, Math.max(3, 60 * k), 6, 3); ctx.fill();
   }
@@ -1158,7 +1158,7 @@ function renderSidePanels() {
   button(lx + 14, 396, lw - 28, 56, '준비 완료', () => playerReady(), { style: plan ? 'primary' : 'normal', disabled: !plan, sub: 'SPACE', size: 20 });
   text(plan ? 'AI의 이동과 공격은 비공개' : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 470, 11, C.dim, 'center', 600);
   const td = WEAPONS[p.weapon].techs[p.tech];
-  text(`${td.name}: ${td.desc} · 대미지 ${td.damage}`, lx + lw / 2, 494, 11, C.p1, 'center', 700);
+  text(`${td.name}: ${td.desc}`, lx + lw / 2, 494, 11, C.p1, 'center', 700);
   text('무기: 검 (다른 무기는 추후 업데이트)', lx + lw / 2, 522, 10.5, C.dim, 'center', 600);
 
   button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
@@ -1330,7 +1330,7 @@ const TUT_PAGES = [
       drawRectArea(r, C.ai, { fill: 0.08, dash: [8, 6], lw: 2 });
       text('AI 직전 공격 (내려베기)', (r.x0 + r.x1) / 2 - 10, r.y1 + 12, 11, '#b83a3a', 'center', 700);
       ctx.save(); ctx.globalAlpha = 0.4 + Math.sin(t * 3) * 0.08; drawStick(gp.x, gp.y, { color: C.ai, facing: -1, idle: t, scale: SC }); ctx.restore();
-      text('AI 잔상', gp.x, gp.y - 100, 13, '#b83a3a', 'center', 800);
+      text('AI 잔상', gp.x, gp.y - 108, 13, '#b83a3a', 'center', 800);
       const pp = { x: x + 150, y: g };
       drawMarker(pp.x, pp.y, C.p1, '1P', 1, t, SC); drawStick(pp.x, pp.y, { color: C.p1, facing: 1, idle: t, scale: SC });
       ctx.fillStyle = 'rgba(255,255,255,0.95)'; rr(x + 310, y + 50, 220, 34, 8); ctx.fill();
@@ -1365,8 +1365,8 @@ const TUT_PAGES = [
       for (let xx = x + 284; xx < x + 455; xx += 13) ctx.fillRect(xx, plat + 4, 10, 4);
       drawMarker(px, py, C.p1, '1P', air ? 0.5 : 1, t, SC);
       drawStick(px, py, { color: C.p1, facing: f, moving, walk: t * 11, air, scale: SC, idle: t });
-      ctx.fillStyle = '#e3e7ed'; rr(px - 24, py - 116, 48, 5, 2.5); ctx.fill();
-      ctx.fillStyle = C.p1; rr(px - 24, py - 116, Math.max(2, 48 * stam / 320), 5, 2.5); ctx.fill();
+      ctx.fillStyle = '#e3e7ed'; rr(px - 24, py - 124, 48, 5, 2.5); ctx.fill();
+      ctx.fillStyle = C.p1; rr(px - 24, py - 124, Math.max(2, 48 * stam / 320), 5, 2.5); ctx.fill();
       const kx = x + 60, ky = y + h - 96;
       drawKeycap(kx + 46, ky, 42, 40, 'W', key === 'W');
       drawKeycap(kx, ky + 46, 42, 40, 'A', key === 'A');
@@ -1399,7 +1399,7 @@ const TUT_PAGES = [
         ctx.save(); ctx.globalAlpha = id === tech ? 1 : 0.3;
         drawStick(tg.x, tg.y, { color: C.ai, facing: -1, scale: SC, idle: t, pose: hit ? 'hit' : 'idle', poseT: ph - 0.55, flash: hit ? Math.max(0, 0.4 - (ph - 0.55)) : 0 });
         ctx.restore();
-        if (hit) { ctx.save(); ctx.globalAlpha = clamp((1.3 - ph) * 2, 0, 1); outlinedText('-25', tg.x, tg.y - 110 - (ph - 0.55) * 20, 26, '#d62f2f', '#fff'); ctx.restore(); }
+        if (hit) { ctx.save(); ctx.globalAlpha = clamp((1.3 - ph) * 2, 0, 1); outlinedText('-25', tg.x, tg.y - 118 - (ph - 0.55) * 20, 26, '#d62f2f', '#fff'); ctx.restore(); }
       }
       const r = miniRect(pp, 1, tech);
       drawRectArea(r, C.p1, { fill: 0.14, lw: 2.5 });
@@ -1479,7 +1479,7 @@ const TUT_PAGES = [
       if (hitNow) {
         const kk = cyc - IMP, a = kk > 1.8 ? Math.max(0, (2.3 - kk) / 0.5) : 1;
         ctx.save(); ctx.globalAlpha = a;
-        outlinedText('-25', ap.x, ap.y - 118 - kk * 10, 32, '#d62f2f', '#fff');
+        outlinedText('-25', ap.x, ap.y - 126 - kk * 10, 32, '#d62f2f', '#fff');
         const mr = miniRect(ap, -1, 'mid');
         outlinedText('MISS', (mr.x0 + mr.x1) / 2, (mr.y0 + mr.y1) / 2 - kk * 10, 26, '#6b7584', '#fff');
         ctx.restore();
