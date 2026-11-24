@@ -66,14 +66,12 @@ const JUMP_COST = 50;
 const PLAN_TIME = 10;      // 작전 페이즈 제한 시간(초)
 const MAX_HP = 100;
 
-// 발판: 바닥(0층) + 1~3층 발판 (아래에서 점프로 통과, S로 내려가기)
+// 발판: 바닥(0층) + 1~2층 발판 (아래에서 점프로 통과, S로 내려가기)
 const SURFACES = [
   { x0: ARENA.x, x1: ARENA.x + ARENA.w, y: GROUND_Y, lvl: 0, ground: true },
   { x0: 300, x1: 470, y: 512, lvl: 1 },
   { x0: 810, x1: 980, y: 512, lvl: 1 },
-  { x0: 530, x1: 750, y: 388, lvl: 2 },
-  { x0: 330, x1: 480, y: 264, lvl: 3 },
-  { x0: 800, x1: 950, y: 264, lvl: 3 }
+  { x0: 530, x1: 750, y: 388, lvl: 2 }
 ];
 
 // 격돌 페이즈 타임라인(초)
@@ -355,33 +353,39 @@ function drawArrow(x1, y1, x2, y2, color, lw = 2.5, head = 9) {
   ctx.restore();
 }
 
-/* 졸라맨 (크고 긴 비율). (x, y) = 발 위치. 키 약 100px.
+/* 졸라맨 (굵고 단순한 단색 실루엣, 얼굴 표정 없음). (x, y) = 발 위치. 키 약 105px.
    o: color, facing, scale, pose('idle'|'slash'|'hit'|'ko'|'win'), poseT, moving, walk, air,
-      tech(슬래시 종류), flash, alpha, weapon, ghost(점선)                                   */
+      tech(슬래시 종류), flash, alpha, weapon                                                  */
+function shadeHex(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = c => clamp(Math.round(amt < 0 ? c * (1 + amt) : c + (255 - c) * amt), 0, 255);
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
 function drawStick(x, y, o = {}) {
   const f = o.facing || 1, s = o.scale || 1;
   let col = o.color || C.p1;
   if (o.flash > 0 && Math.floor(o.flash * 20) % 2 === 0) col = '#f0a500';
+  const back = shadeHex(col, -0.22);          // 뒤쪽 팔다리는 한 톤 어둡게
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
   ctx.globalAlpha *= (o.alpha ?? 1);
   if (o.pose === 'ko') {
     const k = easeOut(Math.min(1, (o.poseT || 0) * 3));
-    ctx.translate(0, -7 * k); ctx.rotate(-f * Math.PI / 2 * k);
+    ctx.translate(0, -9 * k); ctx.rotate(-f * Math.PI / 2 * k);
   }
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  if (o.ghost) ctx.setLineDash([6, 6]);
-  const L = (pts, w = 6, c = col) => {
+  const L = (pts, w, c) => {
     ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath();
     pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke();
   };
+  const LW = 11;
   const moving = o.moving && !o.air;
   const sw = moving ? Math.sin(o.walk || 0) : 0;
   const bob = moving ? -Math.abs(Math.cos(o.walk || 0)) * 3 : Math.sin((o.idle || 0) * 2.2) * 1;
   let lean = 0;
   if (o.pose === 'hit') lean = -f * 9 * Math.max(0, 1 - (o.poseT || 0) * 1.6);
   if (o.pose === 'slash') lean = f * 6 * Math.min(1, (o.poseT || 0) * 5);
-  const hipX = lean * 0.3, hipY = -42 + bob, neckX = lean, neckY = -76 + bob, headY = -90 + bob;
-  const shX = neckX, shY = neckY + 6;
+  const hipX = lean * 0.3, hipY = -40 + bob, neckX = lean, neckY = -72 + bob, headY = -92 + bob;
+  const shX = neckX, shY = neckY + 4;
   // 검 각도 (오른쪽 바라볼 때 기준, y 아래가 +)
   let sa = -0.75 + sw * 0.08;
   const wp = WEAPONS[o.weapon || 'sword'];
@@ -391,40 +395,31 @@ function drawStick(x, y, o = {}) {
   } else if (o.pose === 'hit') sa = -0.2;
   else if (o.pose === 'win') sa = -1.45;
   else if (o.pose === 'ko') sa = 0.9;
+  // 앞팔: 어깨 → 팔꿈치(아래로 꺾임) → 손
   const armA = clamp(sa, -1.9, 1.5) * 0.8 + 0.15;
-  const hand = [shX + Math.cos(armA) * 30 * f, shY + Math.sin(armA) * 30];
-  // 뒷팔
-  if (o.pose === 'win') L([[shX, shY], [shX - f * 12, shY - 16], [shX - f * 10, shY - 30]]);
-  else L([[shX, shY], [shX - f * 10 - sw * 6, shY + 16], [shX - f * 12 - sw * 8, shY + 32]]);
-  // 다리
+  const hand = [shX + Math.cos(armA) * 32 * f, shY + Math.sin(armA) * 32];
+  const elbow = [(shX + hand[0]) / 2 - f * 3, (shY + hand[1]) / 2 + 9];
+  // 뒷팔 (어둡게)
+  if (o.pose === 'win') L([[shX, shY], [shX - f * 14, shY - 14], [shX - f * 12, shY - 32]], LW, back);
+  else L([[shX, shY], [shX - f * 12 - sw * 6, shY + 16], [shX - f * 6 - sw * 8, shY + 30]], LW, back);
+  // 다리 (뒷다리 어둡게)
   if (o.air) {
-    L([[hipX, hipY], [hipX + f * 14, hipY + 18], [hipX + f * 4, hipY + 38]]);
-    L([[hipX, hipY], [hipX - f * 6, hipY + 22], [hipX - f * 16, hipY + 36]]);
+    L([[hipX, hipY], [hipX - f * 6, hipY + 20], [hipX - f * 16, hipY + 34]], LW, back);
+    L([[hipX, hipY], [hipX + f * 14, hipY + 17], [hipX + f * 4, hipY + 36]], LW, col);
   } else {
-    const k1 = [hipX + (-6 + sw * 10) * 0.6 + f * 3, hipY + 21], k2 = [hipX + (6 - sw * 10) * 0.6 + f * 3, hipY + 21];
-    L([[hipX, hipY], k1, [-9 + sw * 14, 0]]);
-    L([[hipX, hipY], k2, [9 - sw * 14, 0]]);
+    L([[hipX, hipY], [hipX + f * 2 + sw * 5, hipY + 20], [9 - sw * 14, -4]], LW, back);
+    L([[hipX, hipY], [hipX + f * 2 - sw * 5, hipY + 20], [-9 + sw * 14, -4]], LW, col);
   }
   // 몸통
-  L([[hipX, hipY], [neckX, neckY]]);
-  // 머리
-  ctx.beginPath(); ctx.arc(lean + f * 1, headY, 13, 0, TAU);
-  ctx.fillStyle = '#ffffff'; if (!o.ghost) ctx.fill();
-  ctx.strokeStyle = col; ctx.lineWidth = 5; ctx.stroke();
-  if (!o.ghost) {
-    if (o.pose === 'ko') {
-      const ex = lean + f * 5, ey = headY - 1;
-      L([[ex - 3, ey - 3], [ex + 3, ey + 3]], 2, C.text); L([[ex - 3, ey + 3], [ex + 3, ey - 3]], 2, C.text);
-    } else {
-      ctx.fillStyle = C.text; ctx.beginPath(); ctx.arc(lean + f * 6, headY - 2, 2.2, 0, TAU); ctx.fill();
-    }
-  }
+  L([[hipX, hipY], [neckX, neckY]], LW + 2, col);
+  // 머리: 꽉 찬 단색 원 (표정 없음)
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(lean + f * 1, headY, 17, 0, TAU); ctx.fill();
   // 무기 + 앞팔
-  if (o.weapon !== 'none') drawWeaponSprite(o.weapon || 'sword', hand[0], hand[1], f, sa, o.ghost);
-  L([[shX, shY], hand]);
+  if (o.weapon !== 'none') drawWeaponSprite(o.weapon || 'sword', hand[0], hand[1], f, sa, col);
+  L([[shX, shY], elbow, hand], LW, col);
   ctx.restore();
 }
-function drawWeaponSprite(id, hx, hy, f, sa, ghost) {
+function drawWeaponSprite(id, hx, hy, f, sa) {
   const dx = Math.cos(sa) * f, dy = Math.sin(sa);
   const px = -dy, py = dx;
   const wp = WEAPONS[id];
@@ -449,19 +444,21 @@ function drawWeaponSprite(id, hx, hy, f, sa, ghost) {
     ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(bx + px * 6, by + py * 6); ctx.lineTo(bx - px * 6, by - py * 6); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore(); return;
   }
-  // 코등이
-  const gx = hx + dx * 5, gy = hy + dy * 5, gw = id === 'greatsword' ? 12 : 9;
-  ctx.strokeStyle = C.steelDark; ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(gx + px * gw, gy + py * gw); ctx.lineTo(gx - px * gw, gy - py * gw); ctx.stroke();
-  // 칼날
-  const bw = id === 'greatsword' ? 6 : 3.5;
+  // 칼날: 굵고 각진 두 톤 (밝은 면 / 어두운 면)
+  const gx = hx + dx * 6, gy = hy + dy * 6;
+  const bw = id === 'greatsword' ? 10 : 7.5;
   const tx = gx + dx * len, ty = gy + dy * len;
-  ctx.beginPath();
-  ctx.moveTo(gx + px * bw, gy + py * bw); ctx.lineTo(tx - dx * 10 + px * bw, ty - dy * 10 + py * bw);
-  ctx.lineTo(tx, ty); ctx.lineTo(tx - dx * 10 - px * bw, ty - dy * 10 - py * bw); ctx.lineTo(gx - px * bw, gy - py * bw);
-  ctx.closePath();
-  ctx.fillStyle = ghost ? 'rgba(205,211,218,0.4)' : C.steel; ctx.fill();
-  ctx.strokeStyle = C.steelDark; ctx.lineWidth = 1.5; ctx.stroke();
+  const half = (sgn, fill) => {
+    ctx.beginPath();
+    ctx.moveTo(gx, gy); ctx.lineTo(gx + px * bw * sgn, gy + py * bw * sgn);
+    ctx.lineTo(tx - dx * 12 + px * bw * sgn, ty - dy * 12 + py * bw * sgn); ctx.lineTo(tx, ty);
+    ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  };
+  half(1, '#c4ccd6'); half(-1, '#8e99a7');
+  // 코등이
+  const gw = id === 'greatsword' ? 16 : 13;
+  ctx.strokeStyle = C.steelDark; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(gx + px * gw, gy + py * gw); ctx.lineTo(gx - px * gw, gy - py * gw); ctx.stroke();
   ctx.restore();
 }
 // 피아식별: 발밑 링 + 머리 위 라벨
@@ -1051,7 +1048,7 @@ function renderBattle() {
     outlinedText(s, 0, 0, 72, t < 0.8 ? C.text : C.gold, '#ffffff', 900, 12);
     ctx.restore();
   }
-  if (B.banner) {
+  if (B.banner && !(B.resultText && B.phase === 'clash')) {
     const t = B.banner.t;
     const a = t < 0.2 ? t / 0.2 : t > 1.0 ? Math.max(0, (1.3 - t) / 0.3) : 1;
     const cx = ARENA.x + ARENA.w / 2, cy = ARENA.y + 50, bw = 380;
