@@ -592,7 +592,7 @@ function physicsStep(f, dt, inp) {
     f.moving = true;
   } else f.moving = false;
   if (inp.jump && f.grounded) {
-    if (f.stamina >= JUMP_COST) { f.vy = -JUMP_V; f.grounded = false; f.stamina -= JUMP_COST; Sfx.jump(); }
+    if (f.stamina >= JUMP_COST) { f.vy = -JUMP_V; f.grounded = false; f.stamina -= JUMP_COST; if (!f.silent) Sfx.jump(); }
     else if (!f.isAI) showToast('이동력이 부족해 점프할 수 없습니다', 1.2);
   }
   if (inp.drop && f.grounded) {
@@ -612,7 +612,7 @@ function physicsStep(f, dt, inp) {
           if (land < 0 || s.y < SURFACES[land].y) land = i;
         }
       });
-      if (land >= 0) { f.pos.y = SURFACES[land].y; f.vy = 0; f.grounded = true; Sfx.land(); }
+      if (land >= 0) { f.pos.y = SURFACES[land].y; f.vy = 0; f.grounded = true; if (!f.silent) Sfx.land(); }
     }
   }
   f.dropT -= dt;
@@ -677,7 +677,7 @@ let gt = 0;
 let B = null;
 let tutPage = 0, tutT = 0;
 
-function goHome() { scene = 'home'; paused = false; B = null; releaseAllHolds(); }
+function goHome() { if (B && B.online) netLeave(); netCancelRoom(); scene = 'home'; paused = false; B = null; releaseAllHolds(); }
 function enterTutorial() { scene = 'tutorial'; paused = false; tutPage = 0; tutT = 0; }
 function tutGo(d) {
   const n = clamp(tutPage + d, 0, TUT_PAGES.length - 1);
@@ -686,9 +686,13 @@ function tutGo(d) {
 function setFacing(f) { if (B && B.phase === 'plan' && B.p.facing !== f) { B.p.facing = f; Sfx.aim(); } }
 function setTech(t) { if (B && B.phase === 'plan' && B.p.tech !== t) { B.p.tech = t; Sfx.aim(); } }
 
+const OPP = () => (B && B.online ? '상대' : 'AI');
+const ME = () => (B && B.online ? '나' : '1P');
+
 function onKeyPress(k) {
   if (k === 'Escape') {
     if ((scene === 'battle' && B && B.phase !== 'over') || scene === 'tutorial') { paused = !paused; Sfx.ui(); }
+    else if (scene === 'online') { netCancelRoom(); goHome(); }
     return;
   }
   if (paused) return;
@@ -703,7 +707,7 @@ function onKeyPress(k) {
       if (k === 'Digit2' || k === 'Numpad2') setTech('up');
       if (k === 'Digit3' || k === 'Numpad3') setTech('down');
     }
-    if (k === 'KeyR' && B.phase === 'over' && B.overT > 1) startBattle();
+    if (k === 'KeyR' && B.phase === 'over' && B.overT > 1 && !B.online) startBattle();
   } else if (scene === 'tutorial') {
     if (k === 'ArrowRight' || k === 'KeyD' || k === 'Enter') tutGo(1);
     if (k === 'ArrowLeft' || k === 'KeyA') tutGo(-1);
@@ -720,14 +724,18 @@ function makeFighter(isAI, x, y) {
     hp: MAX_HP, disp: MAX_HP, walk: 0, moving: false, pose: 'idle', poseT: 0, flash: 0, hits: 0
   };
 }
-function startBattle() {
+function startBattle(online = null) {
+  const left = ARENA.x + 150, right = ARENA.x + ARENA.w - 150;
+  const meLeft = !online || online.role === 'host';
   B = {
+    online, oppPlans: {}, waitT: 0, overNote: '',
     turn: 0, phase: 'intro', t: 0, timer: PLAN_TIME, lastTick: 99,
-    p: makeFighter(false, ARENA.x + 150, GROUND_Y), ai: makeFighter(true, ARENA.x + ARENA.w - 150, GROUND_Y),
+    p: makeFighter(false, meLeft ? left : right, GROUND_Y), ai: makeFighter(true, meLeft ? right : left, GROUND_Y),
     ghost: null, trail: [], hist: [], pReach: [], aiReach: [],
     fx: [], particles: [], floaters: [], shake: 0, log: [], banner: null, resultText: null,
     result: null, overT: 0, fired: false, fireT: 0, resolved: false
   };
+  if (online) { B.p.name = '나'; B.ai.name = '상대'; B.p.facing = meLeft ? 1 : -1; B.ai.facing = -B.p.facing; }
   B.trail.push(vcopy(B.ai.pos));
   scene = 'battle'; paused = false;
 }
@@ -740,13 +748,16 @@ function beginPlan() {
   p.facing = ai.anchor.x >= p.pos.x ? 1 : -1;
   B.pReach = reachFrom(p.anchor); B.aiReach = reachFrom(ai.anchor);
   // AI는 작전 페이즈 시작 시 비공개로 계획을 확정
-  const plan = aiDecide();
-  ai.planPos = plan.pos; ai.planFacing = plan.facing; ai.planTech = plan.tech;
+  if (!B.online) {
+    const plan = aiDecide();
+    ai.planPos = plan.pos; ai.planFacing = plan.facing; ai.planTech = plan.tech;
+  }
   B.banner = { text: '작전 페이즈', sub: `TURN ${B.turn} · 이동하고 공격 방향을 정하세요`, t: 0, color: C.p1 };
   B.resultText = null;
   Sfx.phase();
 }
-function playerReady() { Sfx.ready(); startClash(); }
+function playerReady() { Sfx.ready(); finishPlan(); }
+function finishPlan() { if (B.online) netSubmitPlan(); else startClash(); }
 function startClash() {
   const { ai } = B;
   ai.from = vcopy(ai.anchor); ai.facing = ai.planFacing; ai.tech = ai.planTech;
@@ -854,7 +865,7 @@ function recordHistory() {
 function resolveClash() {
   const { p, ai } = B;
   B.resolved = true;
-  recordHistory();
+  if (!B.online) recordHistory();
   const pHit = attackHits(p, ai), aHit = attackHits(ai, p);
   for (const [f, hit] of [[p, pHit], [ai, aHit]])
     B.fx.push({ type: 'box', r: techRect(f.pos, f.facing, f.weapon, f.tech), t: 0, life: 0.7, color: f.color, hit });
@@ -881,7 +892,7 @@ function resolveClash() {
   let msg, col;
   if (pHit && aHit) { msg = '상호 명중!'; col = C.gold; }
   else if (pHit) { msg = '명중! 예측 성공'; col = C.p1; }
-  else if (aHit) { msg = '피격! AI에게 읽혔다'; col = C.ai; }
+  else if (aHit) { msg = `피격! ${OPP()}에게 읽혔다`; col = C.ai; }
   else { msg = '양측 모두 빗나감!'; col = C.sub; }
   B.resultText = { msg, col, t: 0 };
   B.log.unshift({ turn: B.turn, pHit, aHit });
@@ -898,6 +909,7 @@ function endClash() {
     else if (ai.hp <= 0) { B.result = 'win'; ai.pose = 'ko'; p.pose = 'win'; Sfx.win(); }
     else { B.result = 'lose'; p.pose = 'ko'; ai.pose = 'win'; Sfx.lose(); }
     p.poseT = ai.poseT = 0;
+    if (B.online) netFinishMatch();
     return;
   }
   beginPlan();
@@ -919,10 +931,15 @@ function updateBattle(dt) {
     B.timer -= dt;
     const c = Math.ceil(B.timer);
     if (c !== B.lastTick) { B.lastTick = c; if (c <= 3 && c > 0) Sfx.tick(); }
-    const dx = (keys.KeyD || keys.ArrowRight || held('right') ? 1 : 0) - (keys.KeyA || keys.ArrowLeft || held('left') ? 1 : 0);
+    const dxRaw = (keys.KeyD || keys.ArrowRight || held('right') ? 1 : 0) - (keys.KeyA || keys.ArrowLeft || held('left') ? 1 : 0);
+    const dx = paused ? 0 : dxRaw;
     physicsStep(p, dt, { dx, jump: p.jumpQ, drop: p.dropQ });
     p.jumpQ = false; p.dropQ = false;
-    if (B.timer <= 0) { B.timer = 0; startClash(); }
+    if (B.timer <= 0) { B.timer = 0; finishPlan(); }
+  } else if (B.phase === 'wait') {
+    B.waitT += dt;
+    physicsStep(p, dt, { dx: 0, jump: false, drop: false });
+    netTryStartClash();
   } else if (B.phase === 'clash') {
     B.t += dt; const t = B.t;
     // 플레이어: 공중이면 착지할 때까지 낙하
@@ -991,7 +1008,7 @@ function renderBattle() {
     if (B.ghost) {
       const r = techRect(B.ghost.pos, B.ghost.facing, B.ghost.weapon, B.ghost.tech);
       drawRectArea(r, C.ai, { alpha: 0.8, fill: 0.08, dash: [8, 6], lw: 2 });
-      text(`AI 직전 공격 · ${WEAPONS[B.ghost.weapon].techs[B.ghost.tech].name}`, (r.x0 + r.x1) / 2, r.y0 + 14, 11, '#b83a3a', 'center', 700);
+      text(`${OPP()} 직전 공격 · ${WEAPONS[B.ghost.weapon].techs[B.ghost.tech].name}`, (r.x0 + r.x1) / 2, r.y0 + 14, 11, '#b83a3a', 'center', 700);
     }
     const gp = B.ghost ? B.ghost.pos : ai.anchor, gf = B.ghost ? B.ghost.facing : ai.facing;
     ctx.globalAlpha = ghostAlpha * 0.4;
@@ -999,7 +1016,7 @@ function renderBattle() {
     ctx.globalAlpha = ghostAlpha;
     ctx.strokeStyle = 'rgba(214,69,69,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.ellipse(gp.x, gp.y, 24, 7, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
-    text(B.ghost ? 'AI 잔상 (직전 턴)' : 'AI 시작 위치', gp.x, gp.y - 134, 12, '#b83a3a', 'center', 800);
+    text(B.ghost ? `${OPP()} 잔상 (직전 턴)` : `${OPP()} 시작 위치`, gp.x, gp.y - 134, 12, '#b83a3a', 'center', 800);
     if (plan) text('?', gp.x, gp.y - 154 + Math.sin(gt * 3) * 2, 20, '#b83a3a', 'center', 900);
     ctx.restore();
   }
@@ -1095,11 +1112,26 @@ function renderBattle() {
     text(B.resultText.msg, cx, cy + 1, 24, B.resultText.col, 'center', 900);
     ctx.restore();
   }
+  if (B.phase === 'wait') {
+    const cx = ARENA.x + ARENA.w / 2, cy = ARENA.y + 50;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.96)'; rr(cx - 190, cy - 30, 380, 60, 12); ctx.fill();
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 2.5; ctx.stroke();
+    const dots = '.'.repeat(1 + Math.floor(gt * 2) % 3);
+    text(`상대가 작전 중${dots}`, cx, cy - 8, 22, C.gold, 'center', 900);
+    text(`준비 완료 · ${Math.floor(B.waitT)}초 대기`, cx, cy + 16, 12, C.sub, 'center', 600);
+    ctx.restore();
+  }
   ctx.restore(); // shake
 
   renderHud();
   renderSidePanels();
   if (B.phase === 'over') renderOver();
+  if (B.phase === 'wait' && B.waitT > 45 && !paused) {
+    const cx = ARENA.x + ARENA.w / 2;
+    text('상대의 응답이 없습니다', cx, ARENA.y + 110, 14, C.ai, 'center', 800);
+    button(cx - 90, ARENA.y + 126, 180, 40, '대전 나가기', () => goHome(), { size: 15, style: 'danger' });
+  }
 }
 
 function renderHud() {
@@ -1107,13 +1139,13 @@ function renderHud() {
   ctx.save();
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, 100);
   ctx.fillStyle = C.line; ctx.fillRect(0, 100, W, 1.5);
-  text('1P', 24, 28, 22, C.p1, 'left', 900);
-  text('플레이어', 64, 29, 14, C.sub, 'left', 600);
+  text(ME(), 24, 28, 22, C.p1, 'left', 900);
+  text(B.online ? `온라인 · 방 ${B.online.code}` : '플레이어', B.online ? 58 : 64, 29, 14, C.sub, 'left', 600);
   text(`${Math.ceil(p.hp)} / ${MAX_HP}`, 470, 29, 15, C.text, 'right', 800);
   drawHpBar(24, 46, 446, 26, p.hp, p.disp, C.p1, false);
   text(`명중 ${p.hits}`, 24, 86, 12, C.sub, 'left', 600);
-  text('AI', W - 24, 28, 22, C.ai, 'right', 900);
-  text('연습 AI', W - 60, 29, 14, C.sub, 'right', 600);
+  text(OPP(), W - 24, 28, 22, C.ai, 'right', 900);
+  text(B.online ? '온라인 상대' : '연습 AI', B.online ? W - 74 : W - 60, 29, 14, C.sub, 'right', 600);
   text(`${Math.ceil(ai.hp)} / ${MAX_HP}`, W - 470, 29, 15, C.text, 'left', 800);
   drawHpBar(W - 470, 46, 446, 26, ai.hp, ai.disp, C.ai, true);
   text(`명중 ${ai.hits}`, W - 24, 86, 12, C.sub, 'right', 600);
@@ -1123,6 +1155,7 @@ function renderHud() {
   if (B.phase === 'plan') { label = '작전 페이즈'; col = C.p1; }
   else if (B.phase === 'clash') { label = '격돌 페이즈'; col = C.ai; }
   else if (B.phase === 'over') { label = '대전 종료'; col = C.gold; }
+  else if (B.phase === 'wait') { label = '상대 대기'; col = C.gold; }
   ctx.font = font(14, 800); const lw = ctx.measureText(label).width + 26;
   ctx.fillStyle = col; rr(cx - lw / 2, 24, lw, 22, 11); ctx.fill();
   text(label, cx, 36, 14, '#ffffff', 'center', 800);
@@ -1138,6 +1171,7 @@ function renderHud() {
     ctx.fillStyle = warn ? C.ai : C.p1; rr(cx - bw / 2, 91, bw * k, 5, 2.5); ctx.fill();
   } else if (B.phase === 'clash') text('격돌!', cx, 69, 28, C.ai, 'center', 900);
   else if (B.phase === 'intro') text(String(PLAN_TIME), cx, 69, 34, C.dim, 'center', 900);
+  else if (B.phase === 'wait') text('준비 완료', cx, 69, 24, C.gold, 'center', 900);
   else text('—', cx, 69, 28, C.dim, 'center', 900);
   ctx.restore();
 }
@@ -1183,7 +1217,7 @@ function renderSidePanels() {
   });
   // ④ 준비 완료
   button(lx + 14, 396, lw - 28, 56, '준비 완료', () => playerReady(), { style: plan ? 'primary' : 'normal', disabled: !plan, sub: 'SPACE', size: 20 });
-  text(plan ? 'AI의 이동과 공격은 비공개' : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 470, 11, C.dim, 'center', 600);
+  text(plan ? `${OPP()}의 이동과 공격은 비공개` : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 470, 11, C.dim, 'center', 600);
   const td = WEAPONS[p.weapon].techs[p.tech];
   text(`${td.name}: ${td.desc}`, lx + lw / 2, 494, 11, C.p1, 'center', 700);
   text('무기: 검 (다른 무기는 추후 업데이트)', lx + lw / 2, 522, 10.5, C.dim, 'center', 600);
@@ -1198,13 +1232,13 @@ function renderSidePanels() {
   panel(rx, 112, rw, 236, '화면 안내');
   const items = [
     [() => { ctx.fillStyle = 'rgba(47,111,209,0.75)'; ctx.fillRect(rx + 14, 156, 28, 4); }, '내 도달 가능 지점'],
-    [() => { ctx.fillStyle = 'rgba(214,69,69,0.55)'; ctx.fillRect(rx + 14, 190, 28, 4); }, 'AI 도달 가능 지점'],
-    [() => { ctx.save(); ctx.globalAlpha = 0.45; drawStick(rx + 28, 240, { scale: 0.3, color: C.ai }); ctx.restore(); }, 'AI 잔상 (직전 턴 위치)'],
-    [() => drawRectArea({ x0: rx + 16, x1: rx + 40, y0: 251, y1: 267 }, C.ai, { fill: 0.08, dash: [3, 3], lw: 1.5 }), 'AI 직전 공격 범위'],
+    [() => { ctx.fillStyle = 'rgba(214,69,69,0.55)'; ctx.fillRect(rx + 14, 190, 28, 4); }, `${OPP()} 도달 가능 지점`],
+    [() => { ctx.save(); ctx.globalAlpha = 0.45; drawStick(rx + 28, 240, { scale: 0.3, color: C.ai }); ctx.restore(); }, `${OPP()} 잔상 (직전 턴 위치)`],
+    [() => drawRectArea({ x0: rx + 16, x1: rx + 40, y0: 251, y1: 267 }, C.ai, { fill: 0.08, dash: [3, 3], lw: 1.5 }), `${OPP()} 직전 공격 범위`],
     [() => drawRectArea({ x0: rx + 16, x1: rx + 40, y0: 285, y1: 301 }, C.p1, { fill: 0.15, lw: 1.5 }), '내 공격 범위'],
   ];
   items.forEach(([draw, label], i) => { draw(); text(label, rx + 52, 158 + i * 34, 12, C.text, 'left', 600); });
-  text('잔상과 기록으로 AI의 습관을 읽으세요', rx + rw / 2, 330, 11, C.dim, 'center', 600);
+  text(`잔상과 기록으로 ${OPP()}의 습관을 읽으세요`, rx + rw / 2, 330, 11, C.dim, 'center', 600);
 
   panel(rx, 358, rw, 200, '격돌 기록');
   if (!B.log.length) text('아직 기록이 없습니다', rx + rw / 2, 460, 12, C.dim, 'center', 600);
@@ -1212,9 +1246,9 @@ function renderSidePanels() {
     const y = 400 + i * 22;
     ctx.globalAlpha = 1 - i * 0.1;
     text(`T${l.turn}`, rx + 14, y, 12, C.sub, 'left', 700);
-    text('1P', rx + 48, y, 12, C.p1, 'left', 800);
+    text(ME(), rx + 48, y, 12, C.p1, 'left', 800);
     text(l.pHit ? '명중' : 'MISS', rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
-    text('AI', rx + 124, y, 12, C.ai, 'left', 800);
+    text(OPP(), rx + 124, y, 12, C.ai, 'left', 800);
     text(l.aHit ? '명중' : 'MISS', rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
     ctx.globalAlpha = 1;
   });
@@ -1255,9 +1289,9 @@ function renderTouchPad() {
   B.log.slice(0, 3).forEach((l, i) => {
     const y = 532 + i * 22;
     text(`T${l.turn}`, rx + 14, y, 12, C.sub, 'left', 700);
-    text('1P', rx + 48, y, 12, C.p1, 'left', 800);
+    text(ME(), rx + 48, y, 12, C.p1, 'left', 800);
     text(l.pHit ? '명중' : 'MISS', rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
-    text('AI', rx + 124, y, 12, C.ai, 'left', 800);
+    text(OPP(), rx + 124, y, 12, C.ai, 'left', 800);
     text(l.aHit ? '명중' : 'MISS', rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
   });
 }
@@ -1268,8 +1302,8 @@ function renderOver() {
   ctx.save(); ctx.globalAlpha = k;
   ctx.fillStyle = 'rgba(25,30,40,0.5)'; ctx.fillRect(0, 0, W, H);
   const cx = W / 2, cy = H / 2;
-  const R = { win: ['VICTORY', '승리!', C.p1, '예측 싸움에서 AI를 꺾었습니다.'],
-              lose: ['DEFEAT', '패배', C.ai, 'AI에게 움직임을 읽혔습니다. 다시 도전해 보세요!'],
+  const R = { win: ['VICTORY', '승리!', C.p1, B.overNote || `예측 싸움에서 ${OPP()}를 꺾었습니다.`],
+              lose: ['DEFEAT', '패배', C.ai, `${OPP()}에게 움직임을 읽혔습니다. 다시 도전해 보세요!`],
               draw: ['DRAW', '무승부', C.gold, '같은 격돌에서 동시에 쓰러졌습니다.'] }[B.result];
   ctx.fillStyle = C.panel; rr(cx - 260, cy - 190, 520, 380, 18); ctx.fill();
   ctx.strokeStyle = R[2]; ctx.lineWidth = 3; ctx.stroke();
@@ -1279,15 +1313,20 @@ function renderOver() {
   ctx.restore();
   text(R[1], cx, cy - 66, 24, C.text, 'center', 800);
   text(R[3], cx, cy - 34, 14, C.sub, 'center', 500);
-  [['진행 턴', B.turn], ['내 명중', `${B.p.hits}회`], ['AI 명중', `${B.ai.hits}회`]].forEach(([a, b], i) => {
+  [['진행 턴', B.turn], ['내 명중', `${B.p.hits}회`], [`${OPP()} 명중`, `${B.ai.hits}회`]].forEach(([a, b], i) => {
     const x = cx - 160 + i * 160;
     text(a, x, cy + 8, 12, C.sub, 'center', 600);
     text(String(b), x, cy + 34, 22, C.text, 'center', 800);
   });
   ctx.restore();
   if (k >= 1) {
-    button(cx - 220, cy + 82, 210, 56, '다시 시작', () => startBattle(), { style: 'primary', sub: 'R', size: 19 });
-    button(cx + 10, cy + 82, 210, 56, '홈으로', () => goHome(), { size: 19 });
+    if (B.online) {
+      button(cx - 220, cy + 82, 210, 56, '온라인 로비', () => { netLeave(); enterOnline(); }, { style: 'primary', size: 19 });
+      button(cx + 10, cy + 82, 210, 56, '홈으로', () => goHome(), { size: 19 });
+    } else {
+      button(cx - 220, cy + 82, 210, 56, '다시 시작', () => startBattle(), { style: 'primary', sub: 'R', size: 19 });
+      button(cx + 10, cy + 82, 210, 56, '홈으로', () => goHome(), { size: 19 });
+    }
   }
 }
 
@@ -1320,7 +1359,7 @@ function renderHome() {
   ctx.fillStyle = C.ai; ctx.fillRect(W / 2 + 10, ty + 74, 150, 4);
   const bw = 340, bh = 52, bx0 = W / 2 - bw / 2, by0 = 196;
   button(bx0, by0, bw, bh, '연습 대전', () => startBattle(), { style: 'primary', size: 20, sub: 'VS 연습 AI' });
-  button(bx0, by0 + 62, bw, bh, '온라인 대전', () => showToast('추후 업데이트 예정입니다'), { size: 20, sub: '실시간 유저 대전', lock: true });
+  button(bx0, by0 + 62, bw, bh, '온라인 대전', () => enterOnline(), { size: 20, sub: '친구와 1:1 대전' });
   button(bx0, by0 + 124, bw, bh, '무기 설정', () => showToast('추후 업데이트 예정입니다'), { size: 20, sub: '무기별 공격 범위', lock: true });
   button(bx0, by0 + 186, bw, bh, '튜토리얼', () => enterTutorial(), { style: 'gold', size: 20, sub: '처음이라면 여기부터' });
   text(touchMode ? '모바일: 가로 화면 권장 · 오른쪽 버튼으로 이동/점프 · 경기장 탭으로 방향·기술 선택' : 'A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 기술 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
@@ -1610,12 +1649,12 @@ const TUT_PAGES = [
     }
   },
   {
-    title: '업데이트 예고 — 온라인 대전', tag: 'COMING SOON',
+    title: '온라인 대전', tag: 'ONLINE',
     lines: [
-      '[온라인 대전]이 추가되면 AI가 아닌 실제 유저와 실시간으로 예측 심리전을 펼칩니다.',
-      '양측이 동시에 작전을 세우고, 서버가 같은 순간에 격돌 결과를 판정합니다.',
-      '사람은 AI보다 훨씬 변덕스럽습니다. 습관을 숨기고, 상대의 습관을 읽는 진짜 두뇌 싸움!',
-      '그 전에 연습 대전에서 AI를 상대로 실력을 갈고닦아 두세요.'
+      '[온라인 대전]에서 AI가 아닌 실제 사람과 1:1 예측 심리전을 펼칩니다.',
+      '한 명이 [방 만들기]로 방을 열고, 다른 한 명이 같은 페이지의 방 목록에서 [참가]를 누르면 바로 시작됩니다.',
+      '양측이 각자 10초 동안 작전을 세우고, 둘 다 준비가 끝나면 같은 순간에 격돌 결과가 판정됩니다.',
+      '온라인 대전은 일시정지되지 않습니다. 사람은 AI보다 변덕스러우니 습관을 숨기세요!'
     ],
     draw(x, y, w, h, t) {
       const scr = (sx, sy, col, label, f) => {
@@ -1633,7 +1672,7 @@ const TUT_PAGES = [
         ctx.fillStyle = Math.floor(t * 4 + i) % 2 ? '#7fd39b' : '#3b6e4c';
         ctx.beginPath(); ctx.arc(sx + 24, sy - 29 + i * 28, 3.5, 0, TAU); ctx.fill();
       }
-      text('매칭 서버', sx, sy + 60, 12, C.sub, 'center', 700);
+      text('공유 저장소', sx, sy + 60, 12, C.sub, 'center', 700);
       ctx.strokeStyle = 'rgba(60,70,90,0.3)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(x + 210, sy); ctx.lineTo(sx - 40, sy); ctx.moveTo(sx + 40, sy); ctx.lineTo(x + w - 210, sy); ctx.stroke(); ctx.setLineDash([]);
       for (let i = 0; i < 3; i++) {
@@ -1642,9 +1681,8 @@ const TUT_PAGES = [
         ctx.fillStyle = C.ai; ctx.beginPath(); ctx.arc(lerp(x + w - 210, sx + 40, k), sy + 5, 4, 0, TAU); ctx.fill();
       }
       ctx.fillStyle = C.panel2; rr(x + 60, y + 330, w - 120, 90, 12); ctx.fill();
-      text('실시간 1:1 매칭 · 동시 판정 · 랭크 & 전적', x + w / 2, y + 362, 16, C.text, 'center', 800);
-      text('준비 중입니다', x + w / 2 + 12, y + 392, 13, C.gold, 'center', 700);
-      drawLock(x + w / 2 - 44, y + 392, 0.7);
+      text('1:1 방 매칭 · 동시 판정', x + w / 2, y + 362, 16, C.text, 'center', 800);
+      text('홈 화면 → 온라인 대전 → 방 만들기 / 참가', x + w / 2, y + 392, 13, C.p1, 'center', 700);
     }
   }
 ];
@@ -1698,6 +1736,11 @@ function renderPause() {
   text('일시정지', cx, cy - ph / 2 + 82, 26, C.text, 'center', 900);
   let y = cy - ph / 2 + 112;
   button(cx - 140, y, 280, 50, '계속하기', () => { paused = false; }, { style: 'primary', size: 18, sub: 'ESC' }); y += 62;
+  if (inBattle && B.online) {
+    text('온라인 대전은 멈추지 않습니다', cx, y + 25, 15, C.sub, 'center', 700); y += 62;
+    button(cx - 140, y, 280, 50, '기권하고 나가기', () => goHome(), { size: 18, style: 'danger' });
+    return;
+  }
   if (inBattle) { button(cx - 140, y, 280, 50, '다시 시작', () => startBattle(), { size: 18 }); y += 62; }
   button(cx - 140, y, 280, 50, '홈으로 나가기', () => goHome(), { size: 18, style: 'danger' });
 }
@@ -1716,11 +1759,201 @@ function renderRotateHint() {
   button(cx - 200, cy + 270, 400, 80, '세로로 계속하기', () => { portraitDismissed = true; }, { size: 30 });
 }
 
+// ----------------------------------------------------------------- 온라인 대전 (아티팩트 공유 db)
+/* 구조: matches/<코드>            방 정보 {host, guest, status: waiting|playing|done, created}
+         matches/<코드>/seats/<역할>  각 플레이어의 최신 작전 {turn, x, y, facing, tech, left}
+   매 턴 각자 자신의 최종 위치(착지 지점)·방향·기술을 저장하고, 상대의 같은 턴 작전이 도착하면
+   양쪽이 같은 판정 함수로 동시에 격돌을 계산한다(결과가 양쪽에서 동일).                         */
+const NET = { db: null, uid: null, tab: Math.random().toString(36).slice(2, 10), ready: false, initing: false,
+  err: null, rooms: [], roomsLoaded: false, myRoom: null, unsubRooms: null, unsubMatch: null, unsubOpp: null,
+  mySeat: null, busy: false, slow: false };
+const ROOM_TTL = 15 * 60 * 1000;
+function netErrMsg(e) {
+  const c = e && e.code;
+  if (c === 'invalid_argument') return '이 페이지에 쓰기 권한이 없습니다. 소유자에게 참여(Contributor) 이상 권한을 요청하세요.';
+  if (c === 'quota_exceeded') return '저장 공간이 가득 찼습니다.';
+  return '연결이 불안정합니다. 잠시 후 다시 시도하세요.';
+}
+async function netInit() {
+  if (NET.ready || NET.initing) return;
+  NET.initing = true; NET.err = null;
+  try {
+    if (!window.claude || typeof window.claude.use !== 'function') { NET.err = 'local'; return; }
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db) { NET.err = 'nodb'; return; }
+    NET.db = db;
+    try { NET.uid = user ? await user.id() : null; } catch (e) { NET.uid = null; }
+    if (!NET.uid) NET.uid = 'tab-' + NET.tab;
+    try { NET.canWrite = user ? await user.can('data.write') : null; } catch (e) { NET.canWrite = null; }
+    NET.ready = true;
+    netSubscribeRooms();
+  } catch (e) { NET.err = 'nodb'; }
+  finally { NET.initing = false; }
+}
+function netSubscribeRooms() {
+  if (NET.unsubRooms) return;
+  NET.roomsLoaded = false; NET.slow = false;
+  const timer = setTimeout(() => { NET.slow = true; }, 10000);
+  NET.unsubRooms = NET.db.collection('matches').where('status', '==', 'waiting').onSnapshot(snap => {
+    NET.rooms = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    if (!snap.metadata.fromCache) { NET.roomsLoaded = true; NET.slow = false; clearTimeout(timer); }
+  }, e => { clearTimeout(timer); NET.err = 'nodb'; NET.unsubRooms = null; });
+}
+function enterOnline() {
+  if (B && B.online) netLeave();
+  B = null; scene = 'online'; paused = false; releaseAllHolds();
+  netInit();
+}
+function makeCode() {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = '';
+  for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)];
+  return c;
+}
+async function netCreateRoom() {
+  if (!NET.ready || NET.busy || NET.myRoom) return;
+  NET.busy = true;
+  try {
+    const code = makeCode();
+    const ref = NET.db.doc('matches/' + code);
+    await ref.set({ host: NET.uid, hostTab: NET.tab, guest: null, status: 'waiting', created: Date.now() });
+    NET.myRoom = code;
+    NET.unsubMatch = ref.onSnapshot(snap => {
+      const d = snap.data();
+      if (d && d.status === 'playing' && d.guest && NET.myRoom === code && scene === 'online') {
+        const c = NET.myRoom; NET.myRoom = null;
+        if (NET.unsubMatch) { NET.unsubMatch(); NET.unsubMatch = null; }
+        netStartMatch(c, 'host');
+      }
+    }, () => {});
+  } catch (e) { showToast(netErrMsg(e), 3.5); Sfx.err(); }
+  finally { NET.busy = false; }
+}
+function netCancelRoom() {
+  if (!NET.myRoom) return;
+  const code = NET.myRoom; NET.myRoom = null;
+  if (NET.unsubMatch) { NET.unsubMatch(); NET.unsubMatch = null; }
+  NET.db.doc('matches/' + code).delete().catch(() => {});
+}
+async function netJoinRoom(code) {
+  if (!NET.ready || NET.busy) return;
+  NET.busy = true;
+  try {
+    const ref = NET.db.doc('matches/' + code);
+    const lease = await ref.acquire({ holder: NET.tab, ttlMs: 4000 });
+    if (!lease.acquired) { showToast('다른 사람이 참가하는 중입니다'); return; }
+    const snap = await ref.get(), d = snap.data();
+    if (!snap.exists || !d || d.status !== 'waiting' || d.guest) { showToast('이미 시작되었거나 닫힌 방입니다'); return; }
+    await ref.update({ guest: NET.uid, guestTab: NET.tab, status: 'playing', started: Date.now() });
+    netStartMatch(code, 'guest');
+  } catch (e) { showToast(netErrMsg(e), 3.5); Sfx.err(); }
+  finally { NET.busy = false; }
+}
+function netStartMatch(code, role) {
+  const opp = role === 'host' ? 'guest' : 'host';
+  startBattle({ code, role });
+  NET.mySeat = NET.db.doc(`matches/${code}/seats/${role}`);
+  const bRef = B;
+  NET.unsubOpp = NET.db.doc(`matches/${code}/seats/${opp}`).onSnapshot(snap => {
+    const d = snap.data();
+    if (!d || B !== bRef) return;
+    if (d.left) { netOppLeft(); return; }
+    if (d.turn && typeof d.x === 'number') B.oppPlans[d.turn] = { x: d.x, y: d.y, facing: d.facing === -1 ? -1 : 1, tech: TECH_ORDER.includes(d.tech) ? d.tech : 'mid' };
+  }, () => {});
+  Sfx.ready();
+}
+// 공중에 있으면 착지 지점을 미리 계산 (실제 낙하와 같은 고정 스텝 물리)
+function simulateLanding(f) {
+  const c = { pos: vcopy(f.pos), vy: f.vy, grounded: f.grounded, dropT: f.dropT, dropFrom: f.dropFrom, stamina: 0, facing: f.facing, isAI: true, silent: true, walk: 0 };
+  for (let i = 0; i < 600 && !c.grounded; i++) physicsStep(c, STEP, { dx: 0, jump: false, drop: false });
+  return c.pos;
+}
+async function netSubmitPlan() {
+  const p = B.p, landed = simulateLanding(p);
+  B.phase = 'wait'; B.waitT = 0; B.myPlan = { turn: B.turn, x: landed.x, y: landed.y, facing: p.facing, tech: p.tech };
+  const body = Object.assign({ left: false }, B.myPlan);
+  try { await NET.mySeat.set(body); }
+  catch (e) { try { await new Promise(r => setTimeout(r, 400 + Math.random() * 400)); await NET.mySeat.set(body); } catch (e2) { showToast(netErrMsg(e2), 3.5); } }
+}
+function netTryStartClash() {
+  const o = B.oppPlans[B.turn];
+  if (!o) return;
+  const ai = B.ai;
+  ai.planPos = { x: clamp(o.x, wallL, wallR), y: o.y }; ai.planFacing = o.facing; ai.planTech = o.tech;
+  startClash();
+}
+function netOppLeft() {
+  if (!B || B.phase === 'over') return;
+  B.phase = 'over'; B.overT = 0; B.result = 'win'; B.overNote = '상대가 대전을 떠났습니다.';
+  B.p.pose = 'win'; B.p.poseT = 0; Sfx.win();
+}
+function netFinishMatch() {
+  if (B.online.role === 'host') NET.db.doc('matches/' + B.online.code).update({ status: 'done' }).catch(() => {});
+}
+function netLeave() {
+  if (NET.unsubOpp) { NET.unsubOpp(); NET.unsubOpp = null; }
+  if (NET.mySeat) { NET.mySeat.set({ left: true, turn: B ? B.turn : 0 }).catch(() => {}); NET.mySeat = null; }
+  if (B && B.online && B.online.role === 'host') NET.db.doc('matches/' + B.online.code).update({ status: 'done' }).catch(() => {});
+}
+
+function renderOnline() {
+  drawBg();
+  text('온라인 대전', 40, 50, 30, C.text, 'left', 900);
+  text('같은 페이지를 연 친구와 1:1로 대전합니다', 40, 86, 15, C.sub, 'left', 600);
+  button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
+  const px = 40, pw = 560;
+  panel(px, 120, pw, 520, null);
+  if (NET.err === 'local' || NET.err === 'nodb') {
+    text(NET.err === 'local' ? '이 파일에서는 온라인 대전을 할 수 없습니다' : '온라인 저장소에 연결할 수 없습니다', px + pw / 2, 300, 20, C.ai, 'center', 800);
+    const lines = NET.err === 'local'
+      ? ['온라인 대전은 claude.ai에 올린 게임 링크에서만 동작합니다.', '로그인한 상태로 게임 링크를 열어 주세요.']
+      : ['claude.ai에 로그인했는지 확인한 뒤 다시 시도하세요.', '보기 전용으로 공유받은 경우 참가할 수 없습니다.'];
+    lines.forEach((l, i) => text(l, px + pw / 2, 344 + i * 26, 14, C.sub, 'center', 600));
+    if (NET.err === 'nodb') button(px + pw / 2 - 90, 420, 180, 46, '다시 시도', () => { NET.err = null; NET.ready = false; netInit(); }, { size: 16 });
+  } else if (!NET.ready) {
+    text('연결 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 360, 20, C.sub, 'center', 800);
+  } else if (NET.myRoom) {
+    text('방을 만들었습니다', px + pw / 2, 200, 18, C.sub, 'center', 700);
+    text(NET.myRoom, px + pw / 2, 280, 96, C.p1, 'center', 900);
+    text('방 코드', px + pw / 2, 345, 13, C.dim, 'center', 700);
+    text('상대가 참가하기를 기다리는 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 400, 18, C.text, 'center', 800);
+    text('친구에게 이 페이지를 열고 방 목록에서 ' + NET.myRoom + ' 방에 참가하라고 알려 주세요', px + pw / 2, 432, 13, C.sub, 'center', 600);
+    button(px + pw / 2 - 90, 480, 180, 46, '방 닫기', () => netCancelRoom(), { size: 16, style: 'danger' });
+  } else {
+    text('새 대전 시작', px + 30, 160, 18, C.text, 'left', 800);
+    text('방을 만들면 다른 사람이 목록에서 보고 참가할 수 있습니다', px + 30, 186, 13, C.sub, 'left', 600);
+    button(px + 30, 210, pw - 60, 64, '방 만들기', () => netCreateRoom(), { style: 'primary', size: 22, disabled: NET.busy });
+    text('혼자 시험해 보려면 이 링크를 새 탭에서 하나 더 열고 참가하세요', px + pw / 2, 300, 12, C.dim, 'center', 600);
+    text('같은 화면에서 2인 대전은 지원하지 않습니다', px + pw / 2, 320, 12, C.dim, 'center', 600);
+    if (NET.canWrite === false) text('보기 전용 권한이라 방을 만들거나 참가할 수 없을 수 있습니다', px + pw / 2, 360, 13, C.ai, 'center', 700);
+  }
+  // 방 목록
+  const lx = 640, lw = 600;
+  panel(lx, 120, lw, 520, '참가할 수 있는 방');
+  if (NET.ready) {
+    const now = Date.now();
+    const rooms = NET.rooms.filter(r => r.id !== NET.myRoom && typeof r.created === 'number' && now - r.created < ROOM_TTL && !r.guest)
+      .sort((a, b) => b.created - a.created).slice(0, 7);
+    if (!rooms.length) {
+      text(NET.roomsLoaded ? '열린 방이 없습니다' : (NET.slow ? '방 목록을 아직 불러오지 못했습니다' : '방 목록을 불러오는 중…'), lx + lw / 2, 360, 16, C.dim, 'center', 700);
+      if (NET.roomsLoaded) text('[방 만들기]로 새 방을 열어 보세요', lx + lw / 2, 388, 13, C.dim, 'center', 600);
+    }
+    rooms.forEach((r, i) => {
+      const y = 158 + i * 66;
+      ctx.fillStyle = C.panel2; rr(lx + 16, y, lw - 32, 56, 10); ctx.fill();
+      text('방 ' + String(r.id).slice(0, 8), lx + 34, y + 20, 20, C.text, 'left', 900);
+      const mins = Math.max(0, Math.floor((now - r.created) / 60000));
+      const mine = r.host === NET.uid;
+      text((mins < 1 ? '방금 열림' : mins + '분 전 열림') + (mine ? ' · 내가 연 방' : ''), lx + 34, y + 42, 12, C.sub, 'left', 600);
+      button(lx + lw - 150, y + 8, 118, 40, '참가', () => netJoinRoom(r.id), { style: 'primary', size: 16, disabled: NET.busy || !!NET.myRoom });
+    });
+  }
+}
+
 // ----------------------------------------------------------------- 메인 루프 (고정 60Hz + Delta Time)
 function update(dt) {
   gt += dt;
   if (toast) { toast.t += dt; if (toast.t > toast.life) toast = null; }
-  if (paused) return;
+  if (paused && !(scene === 'battle' && B && B.online)) return;
   if (scene === 'battle' && B) updateBattle(dt);
   else if (scene === 'tutorial') tutT += dt;
 }
@@ -1730,6 +1963,7 @@ function render() {
   if (scene === 'home') renderHome();
   else if (scene === 'battle') renderBattle();
   else if (scene === 'tutorial') renderTutorial();
+  else if (scene === 'online') renderOnline();
   if (paused) { buttons = []; hoverAny = false; holdZones = []; releaseAllHolds(); renderPause(); }
   if (touchMode && innerHeight > innerWidth && !portraitDismissed) renderRotateHint();
   if (toast) {
