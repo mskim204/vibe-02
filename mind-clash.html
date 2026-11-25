@@ -7,7 +7,7 @@
 <style>
   html, body { margin: 0; height: 100%; background: #d9dfe7; overflow: hidden; }
   body { display: flex; align-items: center; justify-content: center; }
-  canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
@@ -257,14 +257,41 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-cv.addEventListener('pointermove', e => { const p = canvasPoint(e); mouse.x = p.x; mouse.y = p.y; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; releaseAllHolds(); });
+
+// ---- 터치(모바일) 조작: 누르고 있는 버튼(hold) 지원, 멀티터치 ----
+let touchMode = (navigator.maxTouchPoints || 0) > 0 || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+let holdZones = [];          // 매 프레임 등록되는 '누르고 있기' 버튼 영역
+const holds = {};            // zoneId -> pointerId
+const held = id => holds[id] !== undefined;
+function zoneAt(p) { for (const z of holdZones) if (inRect(p, z.x, z.y, z.w, z.h)) return z; return null; }
+function releasePointer(pid) { for (const k in holds) if (holds[k] === pid) delete holds[k]; }
+function releaseAllHolds() { for (const k in holds) delete holds[k]; }
+let portraitDismissed = false;
+
+cv.addEventListener('pointermove', e => {
+  const p = canvasPoint(e);
+  if (e.pointerType !== 'touch' || !Object.values(holds).includes(e.pointerId)) { mouse.x = p.x; mouse.y = p.y; }
+  if (Object.values(holds).includes(e.pointerId)) {   // 손가락을 미끄러뜨려 ◀ ↔ ▶ 전환
+    releasePointer(e.pointerId);
+    const z = zoneAt(p); if (z) holds[z.id] = e.pointerId;
+  }
+});
 cv.addEventListener('pointerdown', e => {
   Sfx.unlock();
-  const p = canvasPoint(e); mouse.x = p.x; mouse.y = p.y;
-  if (e.button !== 0) return;
+  if (e.pointerType === 'touch') touchMode = true;
+  const p = canvasPoint(e);
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  const z = !paused && zoneAt(p);
+  if (z) {
+    holds[z.id] = e.pointerId;
+    if (B && B.phase === 'plan') { if (z.id === 'jump') B.p.jumpQ = true; if (z.id === 'drop') B.p.dropQ = true; }
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {} e.preventDefault(); return; }
+  mouse.x = p.x; mouse.y = p.y;
   onClick(p);
 });
+addEventListener('pointerup', e => releasePointer(e.pointerId));
+addEventListener('pointercancel', e => releasePointer(e.pointerId));
 cv.addEventListener('contextmenu', e => e.preventDefault());
 
 // ----------------------------------------------------------------- UI 버튼 (매 프레임 등록)
@@ -650,7 +677,7 @@ let gt = 0;
 let B = null;
 let tutPage = 0, tutT = 0;
 
-function goHome() { scene = 'home'; paused = false; B = null; }
+function goHome() { scene = 'home'; paused = false; B = null; releaseAllHolds(); }
 function enterTutorial() { scene = 'tutorial'; paused = false; tutPage = 0; tutT = 0; }
 function tutGo(d) {
   const n = clamp(tutPage + d, 0, TUT_PAGES.length - 1);
@@ -892,7 +919,7 @@ function updateBattle(dt) {
     B.timer -= dt;
     const c = Math.ceil(B.timer);
     if (c !== B.lastTick) { B.lastTick = c; if (c <= 3 && c > 0) Sfx.tick(); }
-    const dx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
+    const dx = (keys.KeyD || keys.ArrowRight || held('right') ? 1 : 0) - (keys.KeyA || keys.ArrowLeft || held('left') ? 1 : 0);
     physicsStep(p, dt, { dx, jump: p.jumpQ, drop: p.dropQ });
     p.jumpQ = false; p.dropQ = false;
     if (B.timer <= 0) { B.timer = 0; startClash(); }
@@ -1165,6 +1192,7 @@ function renderSidePanels() {
   button(126, 670, 112, 38, '일시정지', () => { paused = true; }, { size: 15, style: 'ghost', disabled: B.phase === 'over' });
   text('ESC', 232, 700, 9, C.dim, 'right', 700);
 
+  if (touchMode) { renderTouchPad(); return; }
   // 우측: 범례 + 기록
   const rx = W - 238, rw = 224;
   panel(rx, 112, rw, 236, '화면 안내');
@@ -1191,6 +1219,47 @@ function renderSidePanels() {
     ctx.globalAlpha = 1;
   });
   text('A/D 이동 · W 점프 · Space 준비', W - 14, 690, 11, C.dim, 'right', 600);
+}
+
+// 모바일 터치 패드 (오른쪽 패널 자리)
+function holdButton(id, x, y, w, h, drawIcon, label, disabled) {
+  if (!disabled) holdZones.push({ id, x, y, w, h });
+  const on = held(id) && !disabled;
+  ctx.save(); ctx.globalAlpha = disabled ? 0.45 : 1;
+  ctx.fillStyle = 'rgba(30,40,60,0.12)'; rr(x, y + 3, w, h, 14); ctx.fill();
+  ctx.fillStyle = on ? '#d6e4fb' : '#ffffff'; rr(x, y + (on ? 2 : 0), w, h, 14); ctx.fill();
+  ctx.strokeStyle = on ? C.p1 : '#c3ccd8'; ctx.lineWidth = on ? 3 : 1.5; ctx.stroke();
+  drawIcon(x + w / 2, y + h / 2 - 8 + (on ? 2 : 0), on);
+  text(label, x + w / 2, y + h - 16 + (on ? 2 : 0), 13, on ? C.p1 : C.sub, 'center', 800);
+  ctx.restore();
+}
+function tri(cx, cy, dir, col) {
+  ctx.fillStyle = col; ctx.beginPath();
+  if (dir === 'l') { ctx.moveTo(cx - 18, cy); ctx.lineTo(cx + 12, cy - 18); ctx.lineTo(cx + 12, cy + 18); }
+  else if (dir === 'r') { ctx.moveTo(cx + 18, cy); ctx.lineTo(cx - 12, cy - 18); ctx.lineTo(cx - 12, cy + 18); }
+  else if (dir === 'u') { ctx.moveTo(cx, cy - 16); ctx.lineTo(cx - 18, cy + 12); ctx.lineTo(cx + 18, cy + 12); }
+  else { ctx.moveTo(cx, cy + 16); ctx.lineTo(cx - 18, cy - 12); ctx.lineTo(cx + 18, cy - 12); }
+  ctx.closePath(); ctx.fill();
+}
+function renderTouchPad() {
+  const rx = W - 238, rw = 224, plan = B.phase === 'plan' && !paused;
+  panel(rx, 112, rw, 548, '터치 조작');
+  const bw = (rw - 36) / 2;
+  holdButton('left', rx + 14, 140, bw, 118, (x, y, on) => tri(x, y, 'l', on ? C.p1 : C.text), '왼쪽 이동', !plan);
+  holdButton('right', rx + 22 + bw, 140, bw, 118, (x, y, on) => tri(x, y, 'r', on ? C.p1 : C.text), '오른쪽 이동', !plan);
+  holdButton('jump', rx + 14, 270, rw - 28, 100, (x, y, on) => tri(x, y, 'u', on ? C.p1 : C.text), '점프', !plan);
+  holdButton('drop', rx + 14, 382, rw - 28, 80, (x, y, on) => tri(x, y + 2, 'd', on ? C.p1 : C.text), '내려가기', !plan);
+  text('누르고 있으면 이동합니다', rx + rw / 2, 480, 11, C.dim, 'center', 600);
+  text('경기장을 탭하면 방향·기술 선택', rx + rw / 2, 498, 11, C.dim, 'center', 600);
+  // 최근 기록 3개
+  B.log.slice(0, 3).forEach((l, i) => {
+    const y = 532 + i * 22;
+    text(`T${l.turn}`, rx + 14, y, 12, C.sub, 'left', 700);
+    text('1P', rx + 48, y, 12, C.p1, 'left', 800);
+    text(l.pHit ? '명중' : 'MISS', rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
+    text('AI', rx + 124, y, 12, C.ai, 'left', 800);
+    text(l.aHit ? '명중' : 'MISS', rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
+  });
 }
 
 function renderOver() {
@@ -1254,7 +1323,7 @@ function renderHome() {
   button(bx0, by0 + 62, bw, bh, '온라인 대전', () => showToast('추후 업데이트 예정입니다'), { size: 20, sub: '실시간 유저 대전', lock: true });
   button(bx0, by0 + 124, bw, bh, '무기 설정', () => showToast('추후 업데이트 예정입니다'), { size: 20, sub: '무기별 공격 범위', lock: true });
   button(bx0, by0 + 186, bw, bh, '튜토리얼', () => enterTutorial(), { style: 'gold', size: 20, sub: '처음이라면 여기부터' });
-  text('A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 기술 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
+  text(touchMode ? '모바일: 가로 화면 권장 · 오른쪽 버튼으로 이동/점프 · 경기장 탭으로 방향·기술 선택' : 'A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 기술 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
   text('v0.2 · Canvas / Web Audio', W - 14, 16, 11, C.dim, 'right', 500);
 }
 
@@ -1341,7 +1410,7 @@ const TUT_PAGES = [
   {
     title: '② 좌우 이동 · 점프 · 발판', tag: 'MOVE',
     lines: [
-      'A/D(←/→)로 좌우 이동, W(↑)로 점프, S(↓)로 발판 아래로 내려갑니다.',
+      'A/D(←/→)로 좌우 이동, W(↑)로 점프, S(↓)로 발판 아래로 내려갑니다. 모바일에서는 오른쪽 패널의 터치 버튼을 누르고 있으면 됩니다.',
       '높은 곳에는 발판 위에 서 있어야만 머무를 수 있습니다. 공중에 뜬 채로 턴이 끝나면 아래 발판이나 바닥까지 떨어집니다.',
       '한 턴의 이동력은 320입니다. 1px 이동마다 1, 점프 1회에 50이 소모됩니다. (머리 위·왼쪽 패널 게이지)',
       '발판 위의 파란 띠가 이번 턴에 도달할 수 있는 지점입니다.'
@@ -1633,6 +1702,20 @@ function renderPause() {
   button(cx - 140, y, 280, 50, '홈으로 나가기', () => goHome(), { size: 18, style: 'danger' });
 }
 
+// 세로 화면 안내
+function renderRotateHint() {
+  buttons = []; holdZones = [];
+  ctx.fillStyle = 'rgba(25,30,40,0.82)'; ctx.fillRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 - 60, a = Math.sin(gt * 2) * 0.5 - 0.3;
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.max(-Math.PI / 2, Math.min(0, a * 2)));
+  ctx.fillStyle = '#ffffff'; rr(-60, -100, 120, 200, 18); ctx.fill();
+  ctx.fillStyle = C.p1; rr(-48, -82, 96, 164, 8); ctx.fill();
+  ctx.restore();
+  text('화면을 가로로 돌려주세요', cx, cy + 160, 56, '#ffffff', 'center', 900);
+  text('가로 화면에서 터치 버튼과 경기장이 크게 보입니다', cx, cy + 225, 30, '#d6dde7', 'center', 600);
+  button(cx - 200, cy + 270, 400, 80, '세로로 계속하기', () => { portraitDismissed = true; }, { size: 30 });
+}
+
 // ----------------------------------------------------------------- 메인 루프 (고정 60Hz + Delta Time)
 function update(dt) {
   gt += dt;
@@ -1643,11 +1726,12 @@ function update(dt) {
 }
 function render() {
   ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
-  buttons = []; hoverAny = false;
+  buttons = []; hoverAny = false; holdZones = [];
   if (scene === 'home') renderHome();
   else if (scene === 'battle') renderBattle();
   else if (scene === 'tutorial') renderTutorial();
-  if (paused) { buttons = []; hoverAny = false; renderPause(); }
+  if (paused) { buttons = []; hoverAny = false; holdZones = []; releaseAllHolds(); renderPause(); }
+  if (touchMode && innerHeight > innerWidth && !portraitDismissed) renderRotateHint();
   if (toast) {
     const k = toast.t, a = Math.min(1, k * 6) * Math.min(1, (toast.life - k) * 4);
     ctx.save(); ctx.globalAlpha = a;
