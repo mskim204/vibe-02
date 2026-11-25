@@ -313,6 +313,12 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => held.delete(e.code));
 addEventListener('blur', () => held.clear());
 addEventListener('pointerdown', () => audioInit());
+/* mouse aiming (PC): facing & attacks follow the cursor */
+const MOUSE = { x: VW / 2, y: VH / 2, t: -1e9, click: false };
+const mouseActive = () => typeof G !== 'undefined' && G.state === 'play' && !(typeof TOUCH !== 'undefined' && TOUCH.on) && performance.now() - MOUSE.t < 4000;
+cv.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; const r = cv.getBoundingClientRect(); MOUSE.x = (e.clientX - r.left) / r.width * VW; MOUSE.y = (e.clientY - r.top) / r.height * VH; MOUSE.t = performance.now(); });
+cv.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button !== 0) return; const r = cv.getBoundingClientRect(); MOUSE.x = (e.clientX - r.left) / r.width * VW; MOUSE.y = (e.clientY - r.top) / r.height * VH; MOUSE.t = performance.now(); MOUSE.click = true; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
 
 /* ---------------- AUDIO (Web Audio synthesis only) ---------------- */
 const AU = { ctx: null, master: null, sfx: null, amb: null, nodes: [], white: null, brown: null, vol: Object.assign({ master: .8, sfx: .9, amb: .75 }, store.get('br_vol', {})) };
@@ -1692,9 +1698,9 @@ function drawPlayer(c, P, x, y, t) {
   const suitB = P3('#b59d2e', '#cdb84c', '#86701c');
   const it = P.hand && P.hand.id;
   if (P.useT > 0 && P.useKind !== 'attack') { o.frontHand = [10, o.hipY - o.torsoL - 10]; o.headDY = (o.headDY || 0) - 2; o.headDX = (o.headDX || 0) - 1; }
-  else if (P.atkT > 0) { const a = 1 - P.atkT / .32, f = Math.floor(a * 5) / 5, ang = lerp(-2.5, .7, f * f * (3 - 2 * f)); const sh = [o.lean - 1, o.hipY - o.torsoL + 4]; o.frontHand = [sh[0] + Math.cos(ang) * 19, sh[1] + Math.sin(ang) * 19]; o.lean += 2; o._ang = ang; }
-  else if ((it === 'pistol' || it === 'shotgun') && (P.gunT > 0 || P.atkT > 0 || P.anim === 'idle' || P.anim === 'sneak')) { o.frontHand = [o.lean + 18, o.hipY - o.torsoL + 9]; o.frontBend = -1; if (it === 'shotgun') o.backHand = [o.lean + 10, o.hipY - o.torsoL + 12]; if (P.gunT > 0) o.lean -= 2; }
-  else if ((it === 'flashlight' || it === 'glowstick') && P.hand.on) { o.frontHand = [o.lean + 19, o.hipY - o.torsoL + 8]; o.frontBend = -1; }
+  else if (P.atkT > 0) { const a = 1 - P.atkT / .32, f = Math.floor(a * 5) / 5, ang = lerp(-2.5, .7, f * f * (3 - 2 * f)) + (P.aim || 0) * .6; const sh = [o.lean - 1, o.hipY - o.torsoL + 4]; o.frontHand = [sh[0] + Math.cos(ang) * 19, sh[1] + Math.sin(ang) * 19]; o.lean += 2; o._ang = ang; }
+  else if ((it === 'pistol' || it === 'shotgun') && (P.gunT > 0 || P.atkT > 0 || P.anim === 'idle' || P.anim === 'sneak' || P.aim)) { const am = P.aim || 0; o.frontHand = [o.lean + Math.cos(am) * 18, o.hipY - o.torsoL + 5 + Math.sin(am) * 18]; o.frontBend = -1; if (it === 'shotgun') o.backHand = [o.lean + 10, o.hipY - o.torsoL + 12]; if (P.gunT > 0) o.lean -= 2; }
+  else if ((it === 'flashlight' || it === 'glowstick') && P.hand.on) { const am = P.aim || 0; o.frontHand = [o.lean + Math.cos(am) * 19, o.hipY - o.torsoL + 5 + Math.sin(am) * 19]; o.frontBend = -1; }
   else if (it) o.frontHand = [o.lean + 8 + Math.sin(o.ph * 6.28) * 1.5, o.hipY - o.torsoL + 19];
   // ground shadow (on scene)
   if (!P.swim) { c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(Math.round(x) - 14, Math.round(y) - 1, 28, 3); }
@@ -1723,7 +1729,9 @@ function drawPlayer(c, P, x, y, t) {
       else if (stage >= 2 && Math.floor(t * 3) % 5 === 0) { px(h[0] + 4, h[1], 2, 1, '#ff5a3a'); px(h[0] + 8, h[1], 1, 1, '#ff5a3a'); }
     }
   }));
-  if (it) drawHeld(P.hand, J.hF[0], J.hF[1], o._ang != null ? o._ang : ((it === 'flashlight' || it === 'glowstick') && P.hand.on || ((it === 'pistol' || it === 'shotgun') && (P.gunT > 0 || P.atkT > 0 || P.anim === 'idle' || P.anim === 'sneak')) ? 0 : 1.3));
+  const aimed = (it === 'pistol' || it === 'shotgun' || ((it === 'flashlight' || it === 'glowstick') && P.hand.on)) && P.aim && o._ang == null;
+  if (aimed) { sp.save(); sp.translate(Math.round(J.hF[0]), Math.round(J.hF[1])); sp.rotate(P.aim); drawHeld(P.hand, 0, 0, 0); sp.restore(); }
+  else if (it) drawHeld(P.hand, J.hF[0], J.hF[1], o._ang != null ? o._ang : ((it === 'flashlight' || it === 'glowstick') && P.hand.on || ((it === 'pistol' || it === 'shotgun') && (P.gunT > 0 || P.atkT > 0 || P.anim === 'idle' || P.anim === 'sneak')) ? 0 : 1.3));
   endSprite(c, x, y, { tex: TEX.suit, tint: hurt ? 'rgba(255,225,215,.9)' : P.tint || null });
   return J;
 }
@@ -2253,6 +2261,19 @@ function beastDeal(accept) {
   if (accept) { P.pact = true; P.cycle = 0; SFX.whisper(); UI.toast('"좋습니다. 거래는 거래죠." — 차가운 손이 당신의 손을 쥐었다.'); if (b) b.state = 'leave'; }
   else { SFX.roar('dweller', 0); G.fx.glitch = 1.2; G.fx.chroma = 2; UI.toast('"…왜 나를 의심하죠? 의심하지 말라고 분명히 말했을 텐데." 그에게서 눈을 떼지 말고 레벨 5를 벗어나라!'); if (b) { b.state = 'hunt'; b.static = false; } }
 }
+function drawDuct(c, W, P) {
+  const camX = Math.round(G.cam), top = FLOOR_Y - 40, h = 32;
+  rect(c, camX, top - 4, VW, h + 8, '#1a1a18'); rect(c, camX, top, VW, h, '#0c0c0b');
+  for (let x = Math.floor(camX / 48) * 48; x < camX + VW; x += 48) { rect(c, x, top - 4, 2, h + 8, '#3a3a36'); rect(c, x + 4, top - 2, 2, 2, '#6a6a62'); rect(c, x + 4, top + h, 2, 2, '#6a6a62'); }
+  rect(c, camX, top - 4, VW, 2, '#4a4a44'); rect(c, camX, top + h + 2, VW, 2, '#4a4a44');
+  const x = Math.round(P.gx), y = top + h - 4, ph = Math.sin(P.gait * 6), d = P.dir;
+  rect(c, x - 16, y - 10, 30, 9, '#c8b43a'); rect(c, x - 16, y - 10, 30, 2, '#e8d878'); rect(c, x - 16, y - 2, 30, 1, '#8a7a24');
+  rect(c, x + d * 18 - 7, y - 15, 14, 13, '#d8c43f'); rect(c, x + d * 20 - 3, y - 12, 7, 8, '#11161c');
+  rect(c, x + d * 8 + Math.round(ph * 4), y - 2, 4, 3, '#151515'); rect(c, x - d * 4 - Math.round(ph * 4), y - 2, 4, 3, '#151515');
+  rect(c, x - d * 16 + Math.round(ph * 3), y - 4, 6, 4, '#a06428');
+  if (P.hand && P.hand.on && P.hand.charge > 0) LIGHTS.push({ x: x + d * 60, y: y - 8, r: 90, a: .7 });
+  LIGHTS.push({ x, y: y - 6, r: 40, a: .5 });
+}
 function startFall() {
   G.fallT = 1.5; SFX.creak(); tone(300, 1.2, { type: 'sawtooth', slide: 60, vol: .08 }); UI.toast('방이… 뒤집힌다!');
 }
@@ -2335,7 +2356,7 @@ function lightAt(gx) {
   return clamp(l, 0, 1);
 }
 function roomDark(W, room) { if (room.base) return .12; const kdk = (KINDS[room.kind] || {}).dark; if (kdk != null && !W.def.ocean) return W.blackout > 0 ? Math.max(kdk, .9) : kdk; if (W.def.ocean) return room.rz >= 1 ? .5 : [.45, .5, .8, .96, .98, 1][Math.min(5, -room.rz)]; if (room.inside) return .72; let d = 1 - W.def.light; if (room.dark) d = Math.max(d, .94); if (W.blackout > 0) d = Math.max(d, .96); return d; }
-function inBeam(e) { const P = G.P; if (!flashOn()) return false; const dx = e.gx - P.gx; return Math.sign(dx) === P.dir && Math.abs(dx) < 250 * (G.W.def.flashMul || 1) && Math.abs(e.y - 40 - (P.y - 50)) < 95 + Math.abs(dx) * .4; }
+function inBeam(e) { const P = G.P; if (!flashOn()) return false; const dx = e.gx - P.gx; if (Math.sign(dx) !== P.dir || Math.abs(dx) >= 250 * (G.W.def.flashMul || 1)) return false; const ang = Math.atan2((e.y - 40) - (P.y - 50), Math.max(1, Math.abs(dx))); return Math.abs(ang - (P.aim || 0)) < .5 || Math.abs(e.y - 40 - (P.y - 50)) < 40; }
 function playerVis() { const P = G.P; if (P.hidden) return 0; let v = lightAt(P.gx); if (flashOn()) v = Math.max(v, .85); if (P.anim === 'sneak') v *= .55; else if (P.anim === 'idle') v *= .75; return clamp(v, .07, 1.2); }
 function safeZone() { return roomAt(G.W, G.P.gx, G.P.rz).base; }
 function hurtPlayer(dmg, src, dx) {
@@ -2628,6 +2649,7 @@ function updateEntities(dt) {
     if (e.travelT > 0) { e.travelT -= dt; e.vx = 0; if (e.travelT <= 0) { e.rz = e.travelRz; e.gx = e.travelX; } continue; }
     if (e.emerge > 0) e.emerge -= dt;
     if (e.atkPh) updAtk(e, dt, T, dx); else if (!entityFight(e, dt, W)) AI[e.type](e, dt, dx, dist, T, sf);
+    if (P.duct && T === P && P.noise > dist && !e.static && !e.fake && ['hound', 'wretch', 'clump', 'crawler', 'skinstealer', 'arachnid', 'partygoer', 'strider', 'faceling'].includes(e.type) && (e.type !== 'faceling' || e.state === 'hostile')) { e.vx = Math.sign(dx) * 40; if (Math.abs(dx) > 4) e.dir = Math.sign(dx); }
     if (!e.static && !e.fake && !HOSTILE_STATES[e.state] && e.type !== 'deathmoth' && Math.random() < dt * .35) { // a wandering entity may wander off through a passage
       const rm = roomAt(W, e.gx, e.rz), rr = Math.floor(e.gx / ROOM_W);
       if (rm.inDoor != null && Math.abs(rm.x0 + rm.inDoor - e.gx) < 24) { e.travelT = .45; e.travelRz = e.rz + 1; e.travelX = e.gx; }
@@ -2729,7 +2751,10 @@ function useHand() {
     it.mag--; P.atkT = .2; P.atkHit = true; P.gunT = .12; P.noise = Math.max(P.noise, d.pellets ? 700 : 560); P.shotNoiseT = .5;
     tone(90, .25, { type: 'square', slide: 40, vol: .35 }); noiseHit(.35, { type: 'lowpass', f: 2500, vol: .55 }); G.fx.shake = Math.max(G.fx.shake, d.pellets ? 7 : 4);
     LIGHTS.push({ x: P.gx + P.dir * 30, y: P.y - 46, r: 120, a: 1, c: 'warm' }); G.muzzle = .06;
-    const hits = G.W.ents.filter(e => e.rz === P.rz && !e.fake && !e.dead && Math.sign(e.gx - P.gx) === P.dir && Math.abs(e.gx - P.gx) < d.range && (!G.W.def.ocean || Math.abs((e.oy || 0) - P.oy) < 80)).sort((a, b) => Math.abs(a.gx - P.gx) - Math.abs(b.gx - P.gx)).slice(0, d.pellets || 1);
+    const aim = P.aim || 0, sy = P.y - 52, span = e => { const t = e.type, fly = t === 'deathmoth' && !e.female; return fly ? [e.y - 22, e.y + 18] : t === 'watcher' ? [e.y - 172, e.y - 128] : t === 'strider' ? [e.y - 140, e.y] : t === 'cballoon' ? [e.y - 30, e.y] : ['hound', 'crawler', 'deathrat', 'arachnid', 'clump', 'burster'].includes(t) ? [e.y - 48, e.y] : [e.y - 100, e.y]; };
+    const onLine = e => { const ly = sy + Math.tan(aim) * Math.abs(e.gx - P.gx), [t0, t1] = span(e); return ly > t0 - (d.pellets ? 26 : 12) && ly < t1 + 10; };
+    const hits = G.W.ents.filter(e => e.rz === P.rz && !e.fake && !e.dead && Math.sign(e.gx - P.gx) === P.dir && Math.abs(e.gx - P.gx) < d.range && (G.W.def.ocean ? Math.abs((e.oy || 0) - P.oy) < 80 : onLine(e))).sort((a, b) => Math.abs(a.gx - P.gx) - Math.abs(b.gx - P.gx)).slice(0, d.pellets || 1);
+    { const far = hits.length ? Math.abs(hits[hits.length - 1].gx - P.gx) : d.range; G.tracer = { x1: P.gx + P.dir * 26, y1: sy, x2: P.gx + P.dir * far, y2: sy + Math.tan(aim) * far, t: .07 }; }
     for (const e of hits) { const dd = Math.abs(e.gx - P.gx); for (let k = 0; k < 6; k++) G.W.parts.push({ x: e.gx, y: e.y - 40, vx: rand(-60, 60), vy: rand(-90, -10), life: .5, c: e.type === 'skinstealer' ? 'clear' : 'blood', rz: e.rz, g: 1 });
       if (!ENTS[e.type].hp) { if (!G.noted.gunimm) { G.noted.gunimm = 1; UI.toast(`${ENTS[e.type].ko}에게는 총알이 통하지 않는다!`); } continue; }
       e.provoked = true; e.hp -= d.dmg * (d.pellets ? clamp(1.4 - dd / 200, .5, 1.3) : 1); e.hitT = .25; NET.hitSync(e); e.kb = P.dir * 120; if (e.atkPh === 'wind') { e.atkPh = 'rec'; e.atkT = 0; }
@@ -2833,7 +2858,7 @@ function hidePlayer(o) {
   P.hideSeen = W.ents.filter(e => e.rz === P.rz && HOSTILE_STATES[e.state] && Math.abs(e.gx - P.gx) < 110).map(e => e.id);
   SFX.creak(); UI.toast(P.hideSeen.length ? '숨었다… 하지만 그것이 숨는 모습을 본 것 같다.' : '숨을 죽이고 몸을 숨겼다.');
 }
-function unhide() { const P = G.P; if (!P.hidden) return; P.hidden = null; P.hideSeen = []; SFX.creak(); }
+function unhide() { const P = G.P; if (!P.hidden) return; P.duct = false; P.hidden = null; P.hideSeen = []; SFX.creak(); }
 function ventCrawl(dir) {
   const P = G.P, W = G.W; if (G.fx.fadeDur > 0) return;
   noiseHit(.5, { type: 'bandpass', f: 500, q: 2, vol: .12 }); SFX.clank();
@@ -2875,6 +2900,8 @@ function updatePlayer(dt) {
   if (P.cycle > 60) spd *= .92;
   P.vx = mv * spd;
   if (mv && !(kdown('sneak') && P.anim === 'sneak')) P.dir = mv; // sneaking keeps your gaze fixed (walk backwards while keeping eye contact)
+  if (mouseActive() && !P.duct) { const mx = G.cam + MOUSE.x, my = MOUSE.y, ddx = mx - P.gx; if (Math.abs(ddx) > 6) P.dir = Math.sign(ddx); P.aim = clamp(Math.atan2(my - (P.y - 52), Math.max(12, Math.abs(ddx))), -1.05, 1.05); }
+  else P.aim = 0;
   // movement + collision
   let nx = P.gx + (P.vx + P.kb) * dt; P.kb *= Math.pow(.02, dt); if (Math.abs(P.kb) < 3) P.kb = 0;
   const m = tryMove(W, P.gx, nx, P.rz, 10, false); P.gx = m.x;
@@ -2899,7 +2926,7 @@ function updatePlayer(dt) {
   P.noise = (P.anim === 'run' ? 360 : P.anim === 'walk' ? 125 : P.anim === 'sneak' ? 34 : 0) * surfMul + (P.atkT > 0 ? 160 : 0); if (P.shotNoiseT > 0) P.noise = Math.max(P.noise, 600);
   // stamina
   if (P.anim === 'run') { P.stamina -= 21 * dt; P.restT = 0; if (P.stamina <= 0) { P.stamina = 0; P.staminaLock = true; UI.toast('숨이 차서 더 이상 달릴 수 없다…'); } }
-  else { P.restT += dt; if (P.restT > .6) P.stamina = Math.min(100, P.stamina + (P.anim === 'idle' ? 16 : 11) * dt); }
+  else if (!P.duct) { P.restT += dt; if (P.restT > .6) P.stamina = Math.min(100, P.stamina + (P.anim === 'idle' ? 16 : 11) * dt); }
   if (P.staminaLock && P.stamina > 30) P.staminaLock = false;
   // timers
   P.inv -= dt; P.hurtT = Math.max(0, P.hurtT - dt); P.reloadT = Math.max(0, (P.reloadT || 0) - dt); P.gunT = Math.max(0, (P.gunT || 0) - dt); P.shotNoiseT = Math.max(0, (P.shotNoiseT || 0) - dt);
@@ -2911,7 +2938,7 @@ function updatePlayer(dt) {
       for (const e of W.ents) {
         if (e.rz !== P.rz || e.fake || e.dead) continue; const dx = e.gx - P.gx;
         if (Math.sign(dx) !== P.dir && Math.abs(dx) > 6) continue; if (Math.abs(dx) > P.atkRange + 6) continue;
-        if (e.type === 'deathmoth' && e.y < GROUND - 78) continue;
+        if (e.type === 'deathmoth' && e.y < GROUND - 78 && (P.aim || 0) > -.35) continue;
         hitAny = true;
         if (!ENTS[e.type].hp) { if (!G.noted.imm) { UI.toast(`${ENTS[e.type].ko}에게는 공격이 통하지 않는다!`); G.noted.imm = 1; } continue; }
         if (e.type === 'burster' && e.cocoon > 0) { UI.toast('버스터가 단단한 고치 속에 웅크렸다.'); continue; }
@@ -2940,7 +2967,7 @@ function updatePlayer(dt) {
   if (P.hunger < 22) { const k = .13 * (1 - P.hunger / 22) * dt; P.cycle += k; P.cyc.hunger += k; }
   if (lt < .25 && !flashOn()) { const k = .035 * (d.fearMul || 1) * dt; P.cycle += k; P.cyc.dark += k; }
   { const rmA = roomAt(W, P.gx, P.rz); if (rmA.decor.some(dc => dc.k === 'arch0' && Math.abs(rmA.x0 + dc.x - P.gx) < 40) && P.anim === 'idle') { P.cycle = Math.max(0, P.cycle - .04 * dt); P.stamina = Math.min(100, P.stamina + 8 * dt); if (!G.noted.arch) { G.noted.arch = 1; UI.toast('아치 아래에 서니 잠시 숨이 돌려진다…'); } } }
-  if (P.hidden) { P.stamina = Math.min(100, P.stamina + 6 * dt); if (P.hunger > 30 && P.thirst > 30 && P.cycle < 75) P.cycle = Math.max(0, P.cycle - .05 * dt); }
+  if (P.hidden && !P.duct) { P.stamina = Math.min(100, P.stamina + 6 * dt); if (P.hunger > 30 && P.thirst > 30 && P.cycle < 75) P.cycle = Math.max(0, P.cycle - .05 * dt); }
   if (safe) P.cycle -= .25 * dt; else if (P.hunger > 60 && P.thirst > 60 && lt > .5) P.cycle -= .012 * dt;
   P.cycle = clamp(P.cycle, 0, 100);
   // flashlight battery
@@ -2959,14 +2986,25 @@ function updatePlayer(dt) {
   if (G.god) { P.hp = Math.max(P.hp, 1); P.cycle = Math.min(P.cycle, 99); }
   // input actions
   if (busy) { UI.prompt(null); return; }
+  if (P.hidden && P.duct) { // crawling inside the duct: slow, noisy, tiring
+    const dm = (kdown('right') ? 1 : 0) - (kdown('left') ? 1 : 0);
+    if (dm) { P.dir = dm; P.gx += dm * 34 * dt; P.gait += dt * 1.2; P.stamina = Math.max(0, P.stamina - 3 * dt); P.noise = 160; P.clankT = (P.clankT || 0) - dt; if (P.clankT <= 0) { P.clankT = .7; noiseHit(.12, { type: 'bandpass', f: 900 + Math.random() * 500, q: 4, vol: .12 }); } } else P.noise = 0;
+    const rm = roomAt(W, P.gx, P.rz);
+    let v = rm.props.find(q => q.type === 'vent'); if (!v) { v = { type: 'vent', x: 200 + Math.floor(h32(W.seed, rm.rx, rm.rz, 61) * 560) }; rm.props.push(v); }
+    const atVent = Math.abs(rm.x0 + v.x - P.gx) < 18;
+    if (atVent && khit('interact')) { P.duct = false; P.gx = rm.x0 + v.x; P.hidden = { p: v, r: rm }; P.hideSeen = []; SFX.creak(); UI.toast('환풍구 덮개를 밀어 열었다.'); }
+    UI.prompt(atVent ? `[${keyLabel(KEYS.interact)}] 이 환풍구로 나가기   [${keyLabel(KEYS.left)}/${keyLabel(KEYS.right)}] 계속 기어가기` : `[${keyLabel(KEYS.left)}/${keyLabel(KEYS.right)}] 덕트 안을 기어가는 중… 금속이 덜컹거린다 (아래에서 들을 수 있다)`);
+    return;
+  }
   if (P.hidden) {
     const vent = P.hidden.p.type === 'vent';
     if (khit('interact') || khit('in') || khit('out')) unhide();
-    else if (vent && (khit('left') || khit('right'))) ventCrawl(khit('right') ? 1 : -1);
+    else if (vent && (khit('left') || khit('right'))) { P.duct = true; P.dir = khit('right') ? 1 : -1; P.clankT = 0; UI.toast('덕트 안으로 기어 들어갔다. 걷는 것보다 훨씬 느리고 시끄럽다.'); }
     UI.prompt(vent ? `[${keyLabel(KEYS.interact)}] 환풍구에서 나오기   [${keyLabel(KEYS.left)}/${keyLabel(KEYS.right)}] 덕트를 따라 옆 구역으로 기어가기` : `[${keyLabel(KEYS.interact)}] 밖으로 나오기 · 숨어 있는 동안에는 엔티티가 감지하지 못한다`);
     return;
   }
   if (khit('use')) useHand();
+  if (MOUSE.click) { MOUSE.click = false; if (mouseActive()) useHand(); }
   if (khit('pocketL')) swapPocket('pockL');
   if (khit('pocketR')) swapPocket('pockR');
   if (khit('drop') && P.hand) { dropItem(P.hand); P.hand = null; }
@@ -3108,6 +3146,7 @@ function render(t) {
   }
   // player
   NET.drawRemote(c, W);
+  if (P.duct) drawDuct(c, W, P);
   const J = P.hidden ? { hF: [10, -40] } : drawPlayer(c, P, P.gx, P.y, W.t);
   if (P.sink > 0) { rect(c, P.gx - 22, P.y - P.sink * 46, 44, P.sink * 46 + 4, '#16141a'); for (let i = -22; i < 22; i += 4) rect(c, P.gx + i, P.y - P.sink * 46 + Math.round(Math.sin(W.t * 3 + i) * 2), 4, 2, 'rgba(255,255,255,.1)'); }
   if (P.swim && P.oy > 10 && Math.random() < .2) W.parts.push({ x: P.gx + P.dir * 10, y: P.y - 66, vx: rand(-5, 5), vy: -30, life: 1.5, c: 'bubble', rz: P.rz });
@@ -3141,7 +3180,7 @@ function render(t) {
       beam = { hx, hy };
       const g = m.createRadialGradient(hx, hy, 0, hx, hy, len); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(.6, 'rgba(0,0,0,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
       m.fillStyle = g; m.beginPath(); m.moveTo(hx, hy);
-      for (let a = -spread; a <= spread + .001; a += spread / 6) m.lineTo(hx + Math.cos(a) * len * P.dir, hy + Math.sin(a) * len);
+      for (let a = -spread; a <= spread + .001; a += spread / 6) m.lineTo(hx + Math.cos(a + (P.aim || 0)) * len * P.dir, hy + Math.sin(a + (P.aim || 0)) * len);
       m.closePath(); m.fill();
       const g2 = m.createRadialGradient(hx + P.dir * 40, hy, 0, hx + P.dir * 40, hy, 60); g2.addColorStop(0, 'rgba(0,0,0,.6)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); m.fillStyle = g2; m.fillRect(hx - 100, hy - 60, 200, 120);
     }
@@ -3167,7 +3206,9 @@ function render(t) {
   const tint = { lobby: 'rgba(255,230,80,.05)', pipes: 'rgba(255,120,40,.06)', electric: 'rgba(255,80,40,.04)', water: 'rgba(40,120,160,.08)', hotel: 'rgba(255,60,40,.04)', suburb: 'rgba(40,60,160,.08)', cave: 'rgba(60,40,20,.06)' }[W.def.theme];
   if (tint) { c.fillStyle = tint; c.fillRect(0, 0, VW, VH); }
   // post: vignette, wretched cycle, damage
+  if (G.tracer && G.tracer.t > 0) { G.tracer.t -= 1 / 60; c.strokeStyle = 'rgba(255,240,180,.85)'; c.lineWidth = 1; c.beginPath(); c.moveTo(G.tracer.x1 - camX + sx, G.tracer.y1 + sy); c.lineTo(G.tracer.x2 - camX + sx, G.tracer.y2 + sy); c.stroke(); }
   postFX(c, W, P);
+  if (mouseActive() && !P.duct) { const mx = Math.round(MOUSE.x), my = Math.round(MOUSE.y), col = 'rgba(240,230,180,.9)'; c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(mx - 6, my - 1, 13, 3); c.fillRect(mx - 1, my - 6, 3, 13); c.fillStyle = col; c.fillRect(mx - 5, my, 4, 1); c.fillRect(mx + 2, my, 4, 1); c.fillRect(mx, my - 5, 1, 4); c.fillRect(mx, my + 2, 1, 4); }
   // compose to screen with chromatic aberration / glitch
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (fx.flip > 0) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, VW, VH); ctx.translate(VW / 2, VH / 2); ctx.rotate(Math.PI * Math.min(1, fx.flip)); ctx.translate(-VW / 2, -VH / 2 + fx.flip * 40); }
