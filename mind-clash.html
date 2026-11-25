@@ -1652,7 +1652,7 @@ const TUT_PAGES = [
     title: '온라인 대전', tag: 'ONLINE',
     lines: [
       '[온라인 대전]에서 AI가 아닌 실제 사람과 1:1 예측 심리전을 펼칩니다.',
-      '한 명이 [방 만들기]로 방을 열고, 다른 한 명이 같은 페이지의 방 목록에서 [참가]를 누르면 바로 시작됩니다.',
+      '한 명이 [방 만들기]로 방을 열면 QR 코드가 나옵니다. 상대가 휴대폰 카메라로 찍거나, 같은 페이지의 방 목록에서 [참가]를 누르면 바로 시작됩니다.',
       '양측이 각자 10초 동안 작전을 세우고, 둘 다 준비가 끝나면 같은 순간에 격돌 결과가 판정됩니다.',
       '온라인 대전은 일시정지되지 않습니다. 사람은 AI보다 변덕스러우니 습관을 숨기세요!'
     ],
@@ -1768,6 +1768,29 @@ const NET = { db: null, uid: null, tab: Math.random().toString(36).slice(2, 10),
   err: null, rooms: [], roomsLoaded: false, myRoom: null, unsubRooms: null, unsubMatch: null, unsubOpp: null,
   mySeat: null, busy: false, slow: false };
 const ROOM_TTL = 15 * 60 * 1000;
+// QR/링크로 바로 참가: <게임 링크>#room-<코드>
+const GAME_URL = 'https://claude.ai/artifact/UgFt1LPcH6hzPrVBoFhVTR';
+const roomLink = code => GAME_URL + '#room-' + code;
+let pendingJoin = null;
+function readRoomHash() { const m = /^#room-([A-Za-z0-9]{4})$/.exec(location.hash || ''); return m ? m[1].toUpperCase() : null; }
+function handleRoomHash() {
+  const c = readRoomHash(); if (!c) return;
+  pendingJoin = c;
+  if (!(scene === 'battle' && B && B.online)) enterOnline();
+  netTryPendingJoin();
+}
+function netTryPendingJoin() {
+  if (!pendingJoin || !NET.ready || NET.busy) return;
+  const c = pendingJoin; pendingJoin = null;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  netJoinRoom(c);
+}
+function copyRoomLink(code) {
+  const link = roomLink(code);
+  try {
+    navigator.clipboard.writeText(link).then(() => showToast('참가 링크를 복사했습니다'), () => showToast('복사하지 못했습니다. QR 코드를 찍어 주세요', 3));
+  } catch (e) { showToast('복사하지 못했습니다. QR 코드를 찍어 주세요', 3); }
+}
 function netErrMsg(e) {
   const c = e && e.code;
   if (c === 'invalid_argument') return '이 페이지에 쓰기 권한이 없습니다. 소유자에게 참여(Contributor) 이상 권한을 요청하세요.';
@@ -1778,6 +1801,7 @@ async function netInit() {
   if (NET.ready || NET.initing) return;
   NET.initing = true; NET.err = null;
   try {
+    for (let i = 0; i < 30 && !(window.claude && typeof window.claude.use === 'function'); i++) await new Promise(r => setTimeout(r, 100));
     if (!window.claude || typeof window.claude.use !== 'function') { NET.err = 'local'; return; }
     const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
     if (!db) { NET.err = 'nodb'; return; }
@@ -1787,6 +1811,7 @@ async function netInit() {
     try { NET.canWrite = user ? await user.can('data.write') : null; } catch (e) { NET.canWrite = null; }
     NET.ready = true;
     netSubscribeRooms();
+    netTryPendingJoin();
   } catch (e) { NET.err = 'nodb'; }
   finally { NET.initing = false; }
 }
@@ -1910,14 +1935,22 @@ function renderOnline() {
     lines.forEach((l, i) => text(l, px + pw / 2, 344 + i * 26, 14, C.sub, 'center', 600));
     if (NET.err === 'nodb') button(px + pw / 2 - 90, 420, 180, 46, '다시 시도', () => { NET.err = null; NET.ready = false; netInit(); }, { size: 16 });
   } else if (!NET.ready) {
+    if (pendingJoin) text('방 ' + pendingJoin + '에 참가하는 중', px + pw / 2, 320, 18, C.text, 'center', 800);
     text('연결 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 360, 20, C.sub, 'center', 800);
   } else if (NET.myRoom) {
-    text('방을 만들었습니다', px + pw / 2, 200, 18, C.sub, 'center', 700);
-    text(NET.myRoom, px + pw / 2, 280, 96, C.p1, 'center', 900);
-    text('방 코드', px + pw / 2, 345, 13, C.dim, 'center', 700);
-    text('상대가 참가하기를 기다리는 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 400, 18, C.text, 'center', 800);
-    text('친구에게 이 페이지를 열고 방 목록에서 ' + NET.myRoom + ' 방에 참가하라고 알려 주세요', px + pw / 2, 432, 13, C.sub, 'center', 600);
-    button(px + pw / 2 - 90, 480, 180, 46, '방 닫기', () => netCancelRoom(), { size: 16, style: 'danger' });
+    const code = NET.myRoom, cx = px + pw / 2;
+    text('방 코드', px + 40, 160, 13, C.dim, 'left', 700);
+    text(code, px + 40, 200, 52, C.p1, 'left', 900);
+    text('상대를 기다리는 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + 40, 250, 16, C.text, 'left', 800);
+    const qs = 250, qx = px + pw - qs - 30, qy = 146;
+    drawQR(roomLink(code), qx, qy, qs);
+    text('휴대폰 카메라로 찍으면', px + 40, 300, 15, C.sub, 'left', 700);
+    text('바로 이 방에 참가합니다', px + 40, 322, 15, C.sub, 'left', 700);
+    text(roomLink(code), cx, 430, 11, C.dim, 'center', 600);
+    text('또는 같은 링크를 연 사람이 방 목록에서 참가할 수도 있습니다', cx, 452, 12, C.dim, 'center', 600);
+    button(px + 40, 480, 230, 50, '참가 링크 복사', () => copyRoomLink(code), { size: 16 });
+    button(px + pw - 270, 480, 230, 50, '방 닫기', () => netCancelRoom(), { size: 16, style: 'danger' });
+    text('참가하는 사람도 claude.ai에 로그인하고 이 게임에 참여 권한이 있어야 합니다', cx, 572, 12, C.sub, 'center', 600);
   } else {
     text('새 대전 시작', px + 30, 160, 18, C.text, 'left', 800);
     text('방을 만들면 다른 사람이 목록에서 보고 참가할 수 있습니다', px + 30, 186, 13, C.sub, 'left', 600);
@@ -1947,6 +1980,150 @@ function renderOnline() {
       button(lx + lw - 150, y + 8, 118, 40, '참가', () => netJoinRoom(r.id), { style: 'primary', size: 16, disabled: NET.busy || !!NET.myRoom });
     });
   }
+}
+
+// ----------------------------------------------------------------- QR 코드 생성기 (외부 라이브러리 없음)
+/* 바이트 모드 · 오류 정정 레벨 M · 버전 1~10 (Nayuki QR Code generator 알고리즘을 간추려 이식) */
+const QR = (() => {
+  const ECC_M = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
+  const BLOCKS_M = [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+  const mul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z; };
+  function rsDivisor(deg) {
+    const r = new Array(deg - 1).fill(0); r.push(1); let root = 1;
+    for (let i = 0; i < deg; i++) {
+      for (let j = 0; j < r.length; j++) { r[j] = mul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; }
+      root = mul(root, 0x02);
+    }
+    return r;
+  }
+  function rsRemainder(data, div) {
+    const r = div.map(() => 0);
+    for (const b of data) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= mul(c, f); }); }
+    return r;
+  }
+  function rawModules(v) {
+    let r = (16 * v + 128) * v + 64;
+    if (v >= 2) { const n = Math.floor(v / 7) + 2; r -= (25 * n - 10) * n - 55; if (v >= 7) r -= 36; }
+    return r;
+  }
+  const dataCodewords = v => Math.floor(rawModules(v) / 8) - ECC_M[v] * BLOCKS_M[v];
+  function alignPos(v, size) {
+    if (v === 1) return [];
+    const n = Math.floor(v / 7) + 2, step = Math.ceil((v * 4 + 4) / (n * 2 - 2)) * 2;
+    const r = [6];
+    for (let pos = size - 7; r.length < n; pos -= step) r.splice(1, 0, pos);
+    return r;
+  }
+  function encode(str) {
+    const bytes = Array.from(new TextEncoder().encode(str));
+    let v = 1;
+    for (; v <= 10; v++) if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= dataCodewords(v) * 8) break;
+    if (v > 10) return null;
+    // 데이터 비트열
+    const bits = [];
+    const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(bytes.length, v < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+    const cap = dataCodewords(v) * 8;
+    put(0, Math.min(4, cap - bits.length));
+    put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xEC; bits.length < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    const data = [];
+    for (let i = 0; i < bits.length; i += 8) { let b = 0; for (let k = 0; k < 8; k++) b = (b << 1) | bits[i + k]; data.push(b); }
+    // 오류 정정 + 인터리브
+    const nb = BLOCKS_M[v], eccLen = ECC_M[v], raw = Math.floor(rawModules(v) / 8);
+    const nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = rsDivisor(eccLen), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+      const dat = data.slice(k, k + shortLen - eccLen + (i < nShort ? 0 : 1)); k += dat.length;
+      const ecc = rsRemainder(dat, div);
+      if (i < nShort) dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const cw = [];
+    for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - eccLen || j >= nShort) cw.push(b[i]); });
+    // 모듈 배치
+    const size = v * 4 + 17;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const setF = (x, y, d) => { mod[y][x] = d; fn[y][x] = true; };
+    for (let i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]])
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4);
+      }
+    const ap = alignPos(v, size), na = ap.length;
+    for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) setF(ap[i] + dx, ap[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }
+    const drawFormat = mask => {
+      const dat = (0 << 3) | mask; let rem = dat;   // 레벨 M = 0
+      for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      const b = ((dat << 10) | rem) ^ 0x5412, bit = i => ((b >>> i) & 1) !== 0;
+      for (let i = 0; i <= 5; i++) setF(8, i, bit(i));
+      setF(8, 7, bit(6)); setF(8, 8, bit(7)); setF(7, 8, bit(8));
+      for (let i = 9; i < 15; i++) setF(14 - i, 8, bit(i));
+      for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, bit(i));
+      for (let i = 8; i < 15; i++) setF(8, size - 15 + i, bit(i));
+      setF(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (v >= 7) {
+      let rem = v; for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+      const b = (v << 12) | rem;
+      for (let i = 0; i < 18; i++) { const d = ((b >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3); setF(a, c, d); setF(c, a, d); }
+    }
+    let bi = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+        if (!fn[y][x] && bi < cw.length * 8) { mod[y][x] = ((cw[bi >>> 3] >>> (7 - (bi & 7))) & 1) !== 0; bi++; }
+      }
+    }
+    // 마스크 선택 (간단한 벌점: 연속, 2x2, 밝기 균형)
+    const maskFn = [
+      (x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+      (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+      (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0
+    ];
+    const applyMask = m => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && maskFn[m](x, y)) mod[y][x] = !mod[y][x]; };
+    const penalty = () => {
+      let p = 0, dark = 0;
+      for (let y = 0; y < size; y++) {
+        let rx = 1, ry = 1;
+        for (let x = 0; x < size; x++) {
+          if (mod[y][x]) dark++;
+          if (x > 0) { if (mod[y][x] === mod[y][x - 1]) { rx++; if (rx === 5) p += 3; else if (rx > 5) p++; } else rx = 1;
+                       if (mod[x][y] === mod[x - 1][y]) { ry++; if (ry === 5) p += 3; else if (ry > 5) p++; } else ry = 1; }
+          if (x > 0 && y > 0) { const c = mod[y][x]; if (c === mod[y][x - 1] && c === mod[y - 1][x] && c === mod[y - 1][x - 1]) p += 3; }
+        }
+      }
+      const total = size * size;
+      p += Math.floor(Math.abs(dark * 20 - total * 10) / total) * 10;
+      return p;
+    };
+    let best = 0, bestP = Infinity;
+    for (let m = 0; m < 8; m++) { applyMask(m); drawFormat(m); const pv = penalty(); if (pv < bestP) { bestP = pv; best = m; } applyMask(m); }
+    applyMask(best); drawFormat(best);
+    return { size, dark: (x, y) => mod[y][x] };
+  }
+  return { encode };
+})();
+const QR_CACHE = {};
+function drawQR(str, x, y, size) {
+  if (!(str in QR_CACHE)) QR_CACHE[str] = QR.encode(str);
+  const q = QR_CACHE[str];
+  ctx.save();
+  ctx.fillStyle = '#ffffff'; rr(x, y, size, size, 10); ctx.fill();
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1.5; ctx.stroke();
+  if (q) {
+    const cell = Math.floor(size / (q.size + 8)), off = (size - cell * q.size) / 2;
+    ctx.fillStyle = '#111827';
+    for (let r = 0; r < q.size; r++) for (let c = 0; c < q.size; c++)
+      if (q.dark(c, r)) ctx.fillRect(Math.round(x + off + c * cell), Math.round(y + off + r * cell), cell, cell);
+  }
+  ctx.restore();
 }
 
 // ----------------------------------------------------------------- 메인 루프 (고정 60Hz + Delta Time)
@@ -1992,6 +2169,8 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+addEventListener('hashchange', handleRoomHash);
+setTimeout(handleRoomHash, 0);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && ((scene === 'battle' && B && B.phase !== 'over') || scene === 'tutorial')) paused = true;
 });
