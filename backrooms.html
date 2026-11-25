@@ -3176,13 +3176,13 @@ function render(t) {
   if (flashOn()) {
     const h = P.hand, low = h.charge < 15 && h32(5, Math.floor(W.t * 15), 0, 0) < .3;
     if (!low) {
-      const hx = P.gx + J.hF[0] * P.dir + P.dir * 13 + ox, hy = P.y + J.hF[1] + oy, len = 270 * (W.def.flashMul || 1) * (h.id === 'glowstick' ? .55 : 1), spread = h.id === 'glowstick' ? .7 : .36;
+      const am = P.aim || 0, hx = P.gx + J.hF[0] * P.dir + Math.cos(am) * 13 * P.dir + ox, hy = P.y + J.hF[1] + Math.sin(am) * 13 + oy, len = 270 * (W.def.flashMul || 1) * (h.id === 'glowstick' ? .55 : 1), spread = h.id === 'glowstick' ? .7 : .36;
       beam = { hx, hy };
       const g = m.createRadialGradient(hx, hy, 0, hx, hy, len); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(.6, 'rgba(0,0,0,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
       m.fillStyle = g; m.beginPath(); m.moveTo(hx, hy);
       for (let a = -spread; a <= spread + .001; a += spread / 6) m.lineTo(hx + Math.cos(a + (P.aim || 0)) * len * P.dir, hy + Math.sin(a + (P.aim || 0)) * len);
       m.closePath(); m.fill();
-      const g2 = m.createRadialGradient(hx + P.dir * 40, hy, 0, hx + P.dir * 40, hy, 60); g2.addColorStop(0, 'rgba(0,0,0,.6)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); m.fillStyle = g2; m.fillRect(hx - 100, hy - 60, 200, 120);
+      const g2x = hx + Math.cos(am) * 40 * P.dir, g2y = hy + Math.sin(am) * 40, g2 = m.createRadialGradient(g2x, g2y, 0, g2x, g2y, 60); g2.addColorStop(0, 'rgba(0,0,0,.6)'); g2.addColorStop(1, 'rgba(0,0,0,0)'); m.fillStyle = g2; m.fillRect(hx - 100, hy - 60, 200, 120);
     }
   }
   m.globalCompositeOperation = 'source-over';
@@ -3196,7 +3196,7 @@ function render(t) {
     const a = (L.c ? .09 : .04) * L.a, x = L.x + ox, y = L.y + oy, g = c.createRadialGradient(x, y, 0, x, y, L.r * .7);
     g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`); c.fillStyle = g; c.fillRect(x - L.r, y - L.r, L.r * 2, L.r * 2);
   }
-  if (beam) { const g = c.createRadialGradient(beam.hx, beam.hy, 0, beam.hx, beam.hy, 200); g.addColorStop(0, 'rgba(255,240,190,.10)'); g.addColorStop(1, 'rgba(255,240,190,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(beam.hx, beam.hy); c.lineTo(beam.hx + 220 * P.dir, beam.hy - 80); c.lineTo(beam.hx + 220 * P.dir, beam.hy + 80); c.fill(); }
+  if (beam) { const am = P.aim || 0, L = 220, g = c.createRadialGradient(beam.hx, beam.hy, 0, beam.hx, beam.hy, 200); g.addColorStop(0, 'rgba(255,240,190,.10)'); g.addColorStop(1, 'rgba(255,240,190,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(beam.hx, beam.hy); for (const a of [am - .36, am + .36]) c.lineTo(beam.hx + Math.cos(a) * L * P.dir / Math.cos(.36), beam.hy + Math.sin(a) * L / Math.cos(.36)); c.fill(); }
   c.globalCompositeOperation = 'source-over';
   // glow pass (eyes in the dark)
   c.setTransform(1, 0, 0, 1, Math.round(-camX + sx), Math.round(sy));
