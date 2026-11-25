@@ -1769,8 +1769,13 @@ const NET = { db: null, uid: null, tab: Math.random().toString(36).slice(2, 10),
   mySeat: null, busy: false, slow: false };
 const ROOM_TTL = 15 * 60 * 1000;
 // QR/링크로 바로 참가: <게임 링크>#room-<코드>
-const GAME_URL = 'https://claude.ai/artifact/UgFt1LPcH6hzPrVBoFhVTR';
-const roomLink = code => GAME_URL + '#room-' + code;
+const GAME_URL = 'https://claude.ai/artifact/UgFt1LPcH6hzPrVBoFhVTR';        // claude.ai (로그인 필요)
+const PUBLIC_URL = 'https://mskim204.github.io/vibe-02/mind-clash.html';      // 공개 주소 (로그인 없이 P2P)
+function roomLink(code) {
+  if (NET.mode === 'db') return GAME_URL + '#room-' + code;
+  const here = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : PUBLIC_URL;
+  return here + '#room-' + code;
+}
 let pendingJoin = null;
 function readRoomHash() { const m = /^#room-([A-Za-z0-9]{4})$/.exec(location.hash || ''); return m ? m[1].toUpperCase() : null; }
 function handleRoomHash() {
@@ -1801,8 +1806,11 @@ async function netInit() {
   if (NET.ready || NET.initing) return;
   NET.initing = true; NET.err = null;
   try {
-    for (let i = 0; i < 30 && !(window.claude && typeof window.claude.use === 'function'); i++) await new Promise(r => setTimeout(r, 100));
-    if (!window.claude || typeof window.claude.use !== 'function') { NET.err = 'local'; return; }
+    // claude.ai 아티팩트(iframe) 안이면 공유 저장소, 아니면 로그인 없는 P2P
+    let inFrame = false; try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+    for (let i = 0; i < (inFrame ? 30 : 0) && !(window.claude && typeof window.claude.use === 'function'); i++) await new Promise(r => setTimeout(r, 100));
+    if (!window.claude || typeof window.claude.use !== 'function') { await p2pInit(); return; }
+    NET.mode = 'db';
     const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
     if (!db) { NET.err = 'nodb'; return; }
     NET.db = db;
@@ -1834,7 +1842,7 @@ function makeCode() {
   for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)];
   return c;
 }
-async function netCreateRoom() {
+async function dbCreateRoom() {
   if (!NET.ready || NET.busy || NET.myRoom) return;
   NET.busy = true;
   try {
@@ -1854,12 +1862,13 @@ async function netCreateRoom() {
   finally { NET.busy = false; }
 }
 function netCancelRoom() {
+  if (NET.mode === 'p2p') { p2pCancelRoom(); return; }
   if (!NET.myRoom) return;
   const code = NET.myRoom; NET.myRoom = null;
   if (NET.unsubMatch) { NET.unsubMatch(); NET.unsubMatch = null; }
   NET.db.doc('matches/' + code).delete().catch(() => {});
 }
-async function netJoinRoom(code) {
+async function dbJoinRoom(code) {
   if (!NET.ready || NET.busy) return;
   NET.busy = true;
   try {
@@ -1873,18 +1882,27 @@ async function netJoinRoom(code) {
   } catch (e) { showToast(netErrMsg(e), 3.5); Sfx.err(); }
   finally { NET.busy = false; }
 }
+function netCreateRoom() { return NET.mode === 'p2p' ? p2pCreateRoom() : dbCreateRoom(); }
+function netJoinRoom(code) { return NET.mode === 'p2p' ? p2pJoinRoom(code) : dbJoinRoom(code); }
+// 상대에게서 받은 작전/이탈 처리 (공통)
+function netOnOppData(d) {
+  if (!d || !B || !B.online) return;
+  if (d.left) { netOppLeft(); return; }
+  const turn = Number(d.turn);
+  if (turn >= 1 && typeof d.x === 'number' && typeof d.y === 'number')
+    B.oppPlans[turn] = { x: d.x, y: d.y, facing: d.facing === -1 ? -1 : 1, tech: TECH_ORDER.includes(d.tech) ? d.tech : 'mid' };
+}
 function netStartMatch(code, role) {
   const opp = role === 'host' ? 'guest' : 'host';
   startBattle({ code, role });
+  Sfx.ready();
+  if (NET.mode === 'p2p') return;
   NET.mySeat = NET.db.doc(`matches/${code}/seats/${role}`);
   const bRef = B;
   NET.unsubOpp = NET.db.doc(`matches/${code}/seats/${opp}`).onSnapshot(snap => {
-    const d = snap.data();
-    if (!d || B !== bRef) return;
-    if (d.left) { netOppLeft(); return; }
-    if (d.turn && typeof d.x === 'number') B.oppPlans[d.turn] = { x: d.x, y: d.y, facing: d.facing === -1 ? -1 : 1, tech: TECH_ORDER.includes(d.tech) ? d.tech : 'mid' };
+    if (B !== bRef) return;
+    netOnOppData(snap.data());
   }, () => {});
-  Sfx.ready();
 }
 // 공중에 있으면 착지 지점을 미리 계산 (실제 낙하와 같은 고정 스텝 물리)
 function simulateLanding(f) {
@@ -1896,6 +1914,7 @@ async function netSubmitPlan() {
   const p = B.p, landed = simulateLanding(p);
   B.phase = 'wait'; B.waitT = 0; B.myPlan = { turn: B.turn, x: landed.x, y: landed.y, facing: p.facing, tech: p.tech };
   const body = Object.assign({ left: false }, B.myPlan);
+  if (NET.mode === 'p2p') { p2pSend(body); return; }
   try { await NET.mySeat.set(body); }
   catch (e) { try { await new Promise(r => setTimeout(r, 400 + Math.random() * 400)); await NET.mySeat.set(body); } catch (e2) { showToast(netErrMsg(e2), 3.5); } }
 }
@@ -1912,12 +1931,104 @@ function netOppLeft() {
   B.p.pose = 'win'; B.p.poseT = 0; Sfx.win();
 }
 function netFinishMatch() {
+  if (NET.mode !== 'db') return;
   if (B.online.role === 'host') NET.db.doc('matches/' + B.online.code).update({ status: 'done' }).catch(() => {});
 }
 function netLeave() {
+  if (NET.mode === 'p2p') { p2pLeave(); return; }
   if (NET.unsubOpp) { NET.unsubOpp(); NET.unsubOpp = null; }
   if (NET.mySeat) { NET.mySeat.set({ left: true, turn: B ? B.turn : 0 }).catch(() => {}); NET.mySeat = null; }
   if (B && B.online && B.online.role === 'host') NET.db.doc('matches/' + B.online.code).update({ status: 'done' }).catch(() => {});
+}
+
+// ---- 로그인 없는 P2P (WebRTC, PeerJS 공개 중계 서버로 연결만 주선) ----
+const PEER_PREFIX = 'mindclash-v1-';
+const PEER_SRC = ['https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js', 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js'];
+function loadScript(src) {
+  return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = rej; document.head.appendChild(el); });
+}
+async function p2pInit() {
+  NET.mode = 'p2p';
+  if (typeof window.Peer !== 'function') {
+    for (const src of PEER_SRC) { try { await loadScript(src); if (typeof window.Peer === 'function') break; } catch (e) {} }
+  }
+  if (typeof window.Peer !== 'function') { NET.err = 'nop2p'; return; }
+  NET.uid = 'tab-' + NET.tab; NET.ready = true; NET.roomsLoaded = true;
+  netTryPendingJoin();
+}
+function p2pErrMsg(e) {
+  const t = e && e.type;
+  if (t === 'peer-unavailable') return '방을 찾을 수 없습니다. 이미 시작되었거나 닫힌 방입니다.';
+  if (t === 'browser-incompatible') return '이 브라우저는 온라인 대전을 지원하지 않습니다.';
+  if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') return '연결 서버에 접속하지 못했습니다. 인터넷 연결을 확인하세요.';
+  return '연결에 실패했습니다. 잠시 후 다시 시도하세요.';
+}
+function p2pDestroy() {
+  try { if (NET.conn) NET.conn.close(); } catch (e) {}
+  try { if (NET.peer) NET.peer.destroy(); } catch (e) {}
+  NET.conn = null; NET.peer = null;
+}
+function p2pSend(obj) { try { if (NET.conn && NET.conn.open) NET.conn.send(obj); } catch (e) {} }
+function p2pWire(conn) {
+  conn.on('data', d => netOnOppData(d));
+  conn.on('close', () => { if (NET.conn === conn) netOppLeft(); });
+  conn.on('error', () => { if (NET.conn === conn) netOppLeft(); });
+}
+function p2pCreateRoom(tries = 0) {
+  if (!NET.ready || NET.busy || NET.myRoom) return;
+  NET.busy = true; NET.opening = true;
+  const code = makeCode();
+  const peer = new window.Peer(PEER_PREFIX + code.toLowerCase(), { debug: 0 });
+  NET.peer = peer;
+  peer.on('open', () => { if (NET.peer !== peer) return; NET.busy = false; NET.opening = false; NET.myRoom = code; });
+  peer.on('connection', conn => {
+    if (NET.conn || NET.peer !== peer || !NET.myRoom) { try { conn.close(); } catch (e) {} return; }
+    NET.conn = conn;
+    conn.on('open', () => {
+      p2pWire(conn);
+      const c = NET.myRoom; NET.myRoom = null;
+      if (scene === 'online') netStartMatch(c, 'host');
+    });
+  });
+  peer.on('error', e => {
+    if (NET.peer !== peer) return;
+    if (e && e.type === 'unavailable-id' && tries < 3) { p2pDestroy(); NET.busy = false; p2pCreateRoom(tries + 1); return; }
+    if (NET.myRoom && e && e.type === 'peer-unavailable') return;
+    NET.busy = false; NET.opening = false; NET.myRoom = null; p2pDestroy();
+    showToast(p2pErrMsg(e), 3.5); Sfx.err();
+  });
+}
+function p2pCancelRoom() { NET.myRoom = null; NET.opening = false; NET.busy = false; p2pDestroy(); }
+function p2pJoinRoom(code) {
+  if (!NET.ready || NET.busy) return;
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 4) { showToast('방 코드는 4글자입니다'); return; }
+  NET.busy = true; NET.joining = code;
+  const peer = new window.Peer({ debug: 0 });
+  NET.peer = peer;
+  const fail = msg => { if (NET.peer !== peer) return; clearTimeout(timer); NET.busy = false; NET.joining = null; p2pDestroy(); showToast(msg, 3.5); Sfx.err(); };
+  const timer = setTimeout(() => fail('연결하지 못했습니다. 방 코드를 확인하거나 다시 시도하세요.'), 20000);
+  peer.on('open', () => {
+    const conn = peer.connect(PEER_PREFIX + code.toLowerCase(), { reliable: true });
+    NET.conn = conn;
+    conn.on('open', () => {
+      clearTimeout(timer); NET.busy = false; NET.joining = null;
+      p2pWire(conn);
+      netStartMatch(code, 'guest');
+    });
+  });
+  peer.on('error', e => fail(p2pErrMsg(e)));
+}
+function p2pPromptJoin() {
+  let code = null;
+  try { code = window.prompt('참가할 방 코드 4글자를 입력하세요'); } catch (e) { code = null; }
+  if (code) p2pJoinRoom(code);
+}
+function p2pLeave() {
+  p2pSend({ left: true });
+  const conn = NET.conn, peer = NET.peer;
+  NET.conn = null; NET.peer = null;
+  setTimeout(() => { try { if (conn) conn.close(); } catch (e) {} try { if (peer) peer.destroy(); } catch (e) {} }, 300);
 }
 
 function renderOnline() {
@@ -1927,15 +2038,19 @@ function renderOnline() {
   button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
   const px = 40, pw = 560;
   panel(px, 120, pw, 520, null);
-  if (NET.err === 'local' || NET.err === 'nodb') {
-    text(NET.err === 'local' ? '이 파일에서는 온라인 대전을 할 수 없습니다' : '온라인 저장소에 연결할 수 없습니다', px + pw / 2, 300, 20, C.ai, 'center', 800);
-    const lines = NET.err === 'local'
-      ? ['온라인 대전은 claude.ai에 올린 게임 링크에서만 동작합니다.', '로그인한 상태로 게임 링크를 열어 주세요.']
+  if (NET.err === 'nop2p' || NET.err === 'nodb') {
+    text(NET.err === 'nop2p' ? '온라인 연결 도구를 불러오지 못했습니다' : '온라인 저장소에 연결할 수 없습니다', px + pw / 2, 300, 20, C.ai, 'center', 800);
+    const lines = NET.err === 'nop2p'
+      ? ['인터넷에 연결되어 있는지 확인하세요.', '공개 주소: ' + PUBLIC_URL]
       : ['claude.ai에 로그인했는지 확인한 뒤 다시 시도하세요.', '보기 전용으로 공유받은 경우 참가할 수 없습니다.'];
     lines.forEach((l, i) => text(l, px + pw / 2, 344 + i * 26, 14, C.sub, 'center', 600));
-    if (NET.err === 'nodb') button(px + pw / 2 - 90, 420, 180, 46, '다시 시도', () => { NET.err = null; NET.ready = false; netInit(); }, { size: 16 });
+    button(px + pw / 2 - 90, 420, 180, 46, '다시 시도', () => { NET.err = null; NET.ready = false; netInit(); }, { size: 16 });
   } else if (!NET.ready) {
     if (pendingJoin) text('방 ' + pendingJoin + '에 참가하는 중', px + pw / 2, 320, 18, C.text, 'center', 800);
+  } else if (NET.joining || NET.opening) {
+    text(NET.joining ? '방 ' + NET.joining + '에 연결하는 중' : '방을 여는 중', px + pw / 2, 320, 20, C.text, 'center', 800);
+    text('잠시만 기다려 주세요' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 356, 15, C.sub, 'center', 600);
+    button(px + pw / 2 - 90, 420, 180, 46, '취소', () => { NET.joining = null; p2pCancelRoom(); }, { size: 16 });
     text('연결 중' + '.'.repeat(1 + Math.floor(gt * 2) % 3), px + pw / 2, 360, 20, C.sub, 'center', 800);
   } else if (NET.myRoom) {
     const code = NET.myRoom, cx = px + pw / 2;
@@ -1947,20 +2062,37 @@ function renderOnline() {
     text('휴대폰 카메라로 찍으면', px + 40, 300, 15, C.sub, 'left', 700);
     text('바로 이 방에 참가합니다', px + 40, 322, 15, C.sub, 'left', 700);
     text(roomLink(code), cx, 430, 11, C.dim, 'center', 600);
-    text('또는 같은 링크를 연 사람이 방 목록에서 참가할 수도 있습니다', cx, 452, 12, C.dim, 'center', 600);
+    text(NET.mode === 'p2p' ? '또는 상대가 게임에서 [코드로 참가]를 눌러 ' + code + ' 를 입력해도 됩니다' : '또는 같은 링크를 연 사람이 방 목록에서 참가할 수도 있습니다', cx, 452, 12, C.dim, 'center', 600);
     button(px + 40, 480, 230, 50, '참가 링크 복사', () => copyRoomLink(code), { size: 16 });
     button(px + pw - 270, 480, 230, 50, '방 닫기', () => netCancelRoom(), { size: 16, style: 'danger' });
-    text('참가하는 사람도 claude.ai에 로그인하고 이 게임에 참여 권한이 있어야 합니다', cx, 572, 12, C.sub, 'center', 600);
+    text(NET.mode === 'p2p' ? '로그인 없이 참가할 수 있습니다 · 이 화면을 닫으면 방이 사라집니다' : '참가하는 사람도 claude.ai에 로그인하고 이 게임에 참여 권한이 있어야 합니다', cx, 572, 12, C.sub, 'center', 600);
   } else {
     text('새 대전 시작', px + 30, 160, 18, C.text, 'left', 800);
-    text('방을 만들면 다른 사람이 목록에서 보고 참가할 수 있습니다', px + 30, 186, 13, C.sub, 'left', 600);
+    text(NET.mode === 'p2p' ? '방을 만들면 QR 코드가 나옵니다. 상대가 찍으면 로그인 없이 바로 참가합니다' : '방을 만들면 다른 사람이 목록에서 보고 참가할 수 있습니다', px + 30, 186, 13, C.sub, 'left', 600);
     button(px + 30, 210, pw - 60, 64, '방 만들기', () => netCreateRoom(), { style: 'primary', size: 22, disabled: NET.busy });
     text('혼자 시험해 보려면 이 링크를 새 탭에서 하나 더 열고 참가하세요', px + pw / 2, 300, 12, C.dim, 'center', 600);
     text('같은 화면에서 2인 대전은 지원하지 않습니다', px + pw / 2, 320, 12, C.dim, 'center', 600);
     if (NET.canWrite === false) text('보기 전용 권한이라 방을 만들거나 참가할 수 없을 수 있습니다', px + pw / 2, 360, 13, C.ai, 'center', 700);
+    if (NET.mode === 'db') {
+      text('로그인 없이 하고 싶다면', px + 30, 420, 15, C.text, 'left', 800);
+      text('아래 공개 주소에서 게임을 열면 QR만으로 대전할 수 있습니다', px + 30, 444, 13, C.sub, 'left', 600);
+      text(PUBLIC_URL, px + 30, 470, 13, C.p1, 'left', 700);
+      drawQR(PUBLIC_URL, px + pw - 160, 400, 130);
+    }
   }
-  // 방 목록
+  // 방 목록 (P2P 모드는 목록 대신 코드로 참가)
   const lx = 640, lw = 600;
+  if (NET.mode === 'p2p') {
+    panel(lx, 120, lw, 520, '방에 참가하기');
+    const cx = lx + lw / 2;
+    text('QR 코드를 휴대폰 카메라로 찍으면', cx, 230, 18, C.text, 'center', 800);
+    text('자동으로 방에 참가합니다', cx, 258, 18, C.text, 'center', 800);
+    text('카메라를 쓸 수 없다면 방 코드를 직접 입력하세요', cx, 300, 13, C.sub, 'center', 600);
+    button(cx - 150, 330, 300, 60, '코드로 참가', () => p2pPromptJoin(), { style: 'primary', size: 20, disabled: !NET.ready || NET.busy || !!NET.myRoom });
+    text('로그인 없이 · 두 기기를 직접 연결합니다', cx, 430, 13, C.dim, 'center', 600);
+    text('회사·학교 네트워크에서는 연결이 막힐 수 있습니다', cx, 452, 12, C.dim, 'center', 600);
+    return;
+  }
   panel(lx, 120, lw, 520, '참가할 수 있는 방');
   if (NET.ready) {
     const now = Date.now();
