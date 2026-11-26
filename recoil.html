@@ -6231,7 +6231,7 @@ const OnlineScene = {
 // =====================================================================
 // 18. 모바일 터치 조작
 //   · 왼쪽: 이동 스틱 (좌우 이동, 두 번 튕기면 달리기, 위 = 점프, 아래 = 숙이기·발판 내려가기)
-//   · 오른쪽: 공격 / 가드 / 대시 / 점프 / Q·E·R  — 버튼을 누른 채 끌면 그 방향으로 조준, 그냥 탭하면 상대 자동 조준
+//   · 오른쪽: 공격 / 가드 / 대시 / 점프 / Q·E·R  — 공격·스킬은 이동 스틱을 민 방향(안 밀면 바라보는 방향)으로, 버튼을 누른 채 끌면 그 방향으로
 // =====================================================================
 const Touch = {
   enabled: false, list: new Map(), pressed: new Set(), released: new Set(), prev: {}, lastAim: null,
@@ -6294,14 +6294,18 @@ const Touch = {
     o.s1 = this.pressed.has('s1'); o.s2 = this.pressed.has('s2'); o.s3 = this.pressed.has('s3');
     this.prev = { l: o.l, r: o.r, stickUp, stickDown };
     this.pressed.clear(); this.released.clear();
-    // 조준: 누르고 있는 버튼을 끈 방향 / 아니면 상대 자동 조준
-    const W = World, me = W && W.me, opp = me && me.opp;
+    // 조준 우선순위: ① 버튼을 누른 채 끈 방향 ② 이동 스틱을 민 방향 ③ 캐릭터가 바라보는 정면
+    const W = World, me = W && W.me;
     let aim = null;
-    for (const s of this.list.values()) if (s.kind === 'btn' && s.id !== 'jump' && s.id !== 'dash') {
-      const ddx = s.x - s.bx, ddy = s.y - s.by;
-      if (Math.hypot(ddx, ddy) > 5 && me) { const c = me.chest(), L = Math.hypot(ddx, ddy); aim = V(c.x + ddx / L * 40, c.y + ddy / L * 40); }
+    if (me) {
+      const c = me.chest(), at = (vx, vy) => { const L = Math.hypot(vx, vy) || 1; return V(c.x + vx / L * 40, c.y + vy / L * 40); };
+      for (const s of this.list.values()) if (s.kind === 'btn' && s.id !== 'jump' && s.id !== 'dash') {
+        const ddx = s.x - s.bx, ddy = s.y - s.by;
+        if (Math.hypot(ddx, ddy) > 5) aim = at(ddx, ddy);
+      }
+      if (!aim && stick && Math.hypot(dx, dy) > 0.3) aim = at(Math.abs(dx) < 0.2 ? me.facing * 0.2 : dx, dy);   // 위/아래만 밀면 바라보는 쪽 기준
+      if (!aim) aim = at(me.facing, 0);
     }
-    if (!aim && opp) aim = opp.chest();
     if (aim) { o.aimX = aim.x; o.aimY = aim.y; this.lastAim = aim; }
     return o;
   },
