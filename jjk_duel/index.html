@@ -444,12 +444,11 @@ body{-webkit-touch-callout:none}
   <div class="topbtns"><button class="ibtn" id="btnSound">사운드 켜짐</button></div>
   <div class="home-title"><div class="t1">呪術決戦<span class="seal"><span>戦</span></span></div><div class="t2">주술 카드 듀얼</div></div>
   <nav class="menu">
-    <button class="mbtn feat" data-go="qrplay"><span class="no">01</span><span class="lb">QR로 친구 초대</span><small>찍으면 바로 대전</small></button>
+    <button class="mbtn feat" data-go="qrplay"><span class="no">01</span><span class="lb">QR로 친구 초대</span><small>PR·머지 온라인 대전</small></button>
     <button class="mbtn" data-go="practice"><span class="no">02</span><span class="lb">연습 대전</span><small>AI 상대</small></button>
-    <button class="mbtn" data-go="lobby"><span class="no">03</span><span class="lb">온라인 대전</span><small>방 목록 · 코드</small></button>
-    <button class="mbtn" data-go="ghpr"><span class="no">04</span><span class="lb">GitHub PR 대전</span><small>턴마다 PR·머지</small></button>
-    <button class="mbtn" data-go="deck"><span class="no">05</span><span class="lb">카드 설정</span><small id="homeDeckCnt"></small></button>
-    <button class="mbtn" data-go="tutorial"><span class="no">06</span><span class="lb">튜토리얼</span><small>규칙 · 조작법</small></button>
+    <button class="mbtn" data-go="ghpr"><span class="no">03</span><span class="lb">온라인 대전</span><small>GitHub PR·머지</small></button>
+    <button class="mbtn" data-go="deck"><span class="no">04</span><span class="lb">카드 설정</span><small id="homeDeckCnt"></small></button>
+    <button class="mbtn" data-go="tutorial"><span class="no">05</span><span class="lb">튜토리얼</span><small>규칙 · 조작법</small></button>
   </nav>
   <div class="home-foot">팬메이드 비공식 카드 게임 · 효과음은 Web Audio API로 실시간 합성</div>
 </section>
@@ -499,37 +498,10 @@ body{-webkit-touch-callout:none}
 </section>
 
 <!-- ============ LOBBY ============ -->
-<section id="lobby" class="screen page">
-  <div class="phead"><button class="btn" data-go="home">홈으로</button><h2>온라인 대전</h2><div class="spacer"></div><button class="btn cy" id="btnSrv">서버 설정</button></div>
-  <div class="lobbybody">
-    <div class="lcol">
-      <div class="pcard">
-        <h3>내 정보</h3>
-        <input id="inName" maxlength="12" placeholder="닉네임">
-        <div class="srvstate" id="srvState"></div>
-        <div class="srvstate" id="deckState"></div>
-      </div>
-      <div class="pcard">
-        <h3>방 만들기</h3>
-        <input id="inRoom" maxlength="20" placeholder="방 이름">
-        <button class="btn pri" id="btnCreate" style="width:100%">방 만들기</button>
-      </div>
-      <div class="pcard">
-        <h3>방 코드로 참가</h3>
-        <input id="inCode" maxlength="5" placeholder="방 코드 5자리" style="text-transform:uppercase;letter-spacing:.2em">
-        <button class="btn cy" id="btnJoin" style="width:100%">참가하기</button>
-      </div>
-    </div>
-    <div class="rcol pcard">
-      <h3>방 목록 <small id="lastUpd">3초마다 자동 갱신</small><span class="spacer"></span><button class="btn" id="btnRefresh" style="padding:3px 10px;font-size:12px">새로고침</button></h3>
-      <div id="roomList"><div class="empty">서버 설정 후 방 목록이 표시됩니다.</div></div>
-    </div>
-  </div>
-</section>
 
 <!-- ============ BATTLE ============ -->
 <section id="ghpr" class="screen page">
-  <div class="phead"><button class="btn" data-go="home">홈으로</button><h2>GitHub PR 대전</h2></div>
+  <div class="phead"><button class="btn" data-go="home">홈으로</button><h2>온라인 대전 (GitHub PR)</h2></div>
   <div class="prwrap">
     <div class="pcard">
       <h3>GitHub 연결</h3>
@@ -548,6 +520,7 @@ body{-webkit-touch-callout:none}
     </div>
     <div class="pcard" id="ghRoomCard">
       <h3>대전</h3>
+      <label class="prl">닉네임</label><input id="ghName" maxlength="12" placeholder="닉네임">
       <button class="btn pri" id="ghCreate" style="width:100%">방 만들기</button>
       <div style="display:flex;gap:8px;margin-top:12px"><input id="ghCode" maxlength="5" placeholder="방 코드 5자리" style="text-transform:uppercase;letter-spacing:.2em;margin:0"><button class="btn cy" id="ghJoin">참가</button></div>
     </div>
@@ -605,24 +578,6 @@ body{-webkit-touch-callout:none}
 <div id="toast"></div>
 <div id="result"></div>
 
-<div class="modal" id="srvModal"><div class="mbox">
-  <h3>온라인 서버 설정 (Google Sheets + Apps Script)</h3>
-  <p>온라인 대전은 구글 스프레드시트를 서버로 사용합니다. 한 사람만 아래 과정을 진행하고, 발급된 URL을 함께 대전할 친구와 공유하면 됩니다.</p>
-  <ol>
-    <li>Google Sheets에서 <b>새 스프레드시트</b>를 만듭니다.</li>
-    <li>메뉴 <b>확장 프로그램 → Apps Script</b>를 엽니다.</li>
-    <li>아래 코드를 <b>Code.gs</b>에 붙여넣고 저장합니다. <button class="btn" id="copyGs" style="padding:2px 10px;font-size:12px">코드 복사</button></li>
-    <li><b>배포 → 새 배포 → 웹 앱</b> 선택 · 실행 계정: <b>나</b> · 액세스 권한: <b>모든 사용자</b> → 배포 후 권한 승인</li>
-    <li>발급된 <b>웹 앱 URL (…/exec)</b>을 아래에 붙여넣고 저장합니다.</li>
-    <li><b>(추천) 휴대폰에서도 하려면</b>: Apps Script 왼쪽 <b>[파일 +] → [HTML]</b>, 이름을 <b>index</b>로 만들고 이 게임 index.html 전체를 붙여넣은 뒤 [배포 관리 → 새 버전]으로 배포하세요. 그러면 웹 앱 URL을 여는 것만으로 게임이 실행됩니다.</li>
-  </ol>
-  <pre class="gs" id="gsView"></pre>
-  <div class="pcard" style="margin-top:12px;padding:12px">
-    <input id="inUrl" placeholder="https://script.google.com/macros/s/..../exec">
-    <div style="display:flex;gap:8px"><button class="btn pri" id="saveUrl">저장 및 연결 테스트</button><button class="btn" id="closeSrv">닫기</button></div>
-    <div class="srvstate" id="urlTest"></div>
-  </div>
-</div></div>
 
 <div class="modal" id="cfmModal"><div class="mbox" style="text-align:center;width:min(380px,92vw)"><p id="cfmMsg" style="margin:6px 0 18px"></p><div style="display:flex;gap:8px;justify-content:center"><button class="btn" id="cfmNo">취소</button><button class="btn pri" id="cfmYes">확인</button></div></div></div>
 
@@ -634,15 +589,6 @@ body{-webkit-touch-callout:none}
   <div style="display:flex;gap:8px;justify-content:center;margin-top:12px"><button class="btn" id="qrCopy">주소 복사</button><button class="btn cy" id="qrInvite">대전 초대 QR 만들기</button><button class="btn pri" id="qrClose">닫기</button></div>
 </div></div>
 
-<div class="modal" id="waitModal"><div class="mbox" style="text-align:center;width:min(440px,92vw)">
-  <h3 id="waitTitle">상대를 기다리는 중</h3>
-  <div id="waitQRBox"></div>
-  <div class="bigcode" id="waitCode">-----</div>
-  <button class="btn cy" id="waitCopy">방 코드 복사</button> <button class="btn" id="waitQr">QR로 초대</button>
-  <div class="loading"></div>
-  <p id="waitMsg">방 코드를 친구에게 공유하세요.</p>
-  <button class="btn red" id="waitCancel" style="margin-top:10px">나가기</button>
-</div></div>
 
 <script>
 /* QR 코드 생성 라이브러리 (qrcode-generator 1.4.4, MIT) */
@@ -2945,240 +2891,6 @@ var qrcode = function() {
 }));
 
 </script>
-<script type="text/plain" id="gsSrc">/**
- * 주술결전 카드 듀얼 — 온라인 대전 서버 (Google Apps Script)
- *
- * [설치 방법]
- * 1) Google Sheets에서 새 스프레드시트를 만듭니다.
- * 2) 메뉴: 확장 프로그램 → Apps Script 를 엽니다.
- * 3) Code.gs 내용을 모두 지우고 이 코드를 붙여넣은 뒤 저장(💾)합니다.
- * 4) 오른쪽 위 [배포] → [새 배포] → 톱니바퀴에서 [웹 앱] 선택
- *      - 실행 계정: 나
- *      - 액세스 권한: 모든 사용자
- *    → [배포] → 권한 승인 → 발급된 "웹 앱 URL"(…/exec) 복사
- * 5) (추천) 같은 프로젝트에 HTML 파일을 추가합니다: 왼쪽 [파일 +] → [HTML] → 이름 index
- *    → 내용을 모두 지우고 게임 index.html 전체를 붙여넣고 저장 → [배포 관리]에서 새 버전 배포.
- *    이제 웹 앱 URL을 열면 게임이 바로 뜹니다 (휴대폰 가능, 서버 설정 입력 불필요).
- * 6) 또는 index.html 파일을 직접 열어 [온라인 대전] → [서버 설정]에 URL을 붙여넣어도 됩니다.
- */
-const SHEET_NAME = 'Rooms';
-const TURN_SEC = 60;        // 턴당 제한시간(초)
-const ROOM_TTL_MIN = 30;    // 이 시간(분) 동안 갱신이 없는 방은 자동 삭제
-const HEAD = ['code', 'name', 'host', 'hostName', 'guest', 'guestName', 'guestDeck',
-  'status', 'turn', 'deadline', 'version', 'updated', 'left', 'state'];
-const CODE_CHARS = 'BCDFGHJKLMNPQRSTVWXZ'; // 숫자/모음 제외 → 시트가 숫자·불리언으로 변환하지 않음
-
-function doGet(e) {
-  const prm = (e && e.parameter) || {};
-  // 주소를 그냥 열면(파라미터 없음) 게임 화면을 보여줌 → 휴대폰·PC 어디서나 URL 하나로 플레이
-  if (!prm.q && !prm.action && !prm.callback) {
-    try {
-      return HtmlService.createHtmlOutputFromFile('index')
-        .setTitle('주술결전 카드 듀얼')
-        .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
-        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-    } catch (err) {
-      return out_({ ok: true, message: '서버는 정상입니다. 게임 화면을 띄우려면 Apps Script에 HTML 파일 "index"를 추가하고 게임 index.html 내용을 붙여넣은 뒤 다시 배포하세요.' });
-    }
-  }
-  // 호환 방식(JSONP): ?q=<JSON>&callback=<함수명> 형태로 요청하면 JavaScript로 응답
-  let p = prm;
-  if (prm.q) { try { p = JSON.parse(prm.q); } catch (err) { p = {}; } }
-  const out = route_(p);
-  if (prm.callback && /^[A-Za-z_$][\w$]{0,60}$/.test(prm.callback)) {
-    return ContentService.createTextOutput(prm.callback + '(' + out.getContent() + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return out;
-}
-// 게임 화면(HtmlService) 안에서 google.script.run 으로 호출하는 통신 함수
-function apiCall(json) {
-  let p = {};
-  try { p = JSON.parse(json); } catch (err) { p = {}; }
-  return route_(p).getContent();
-}
-function doPost(e) {
-  let p = {};
-  try { p = JSON.parse(e.postData.contents); } catch (err) { p = {}; }
-  return route_(p);
-}
-// 큰 데이터를 호환 방식으로 보낼 때는 여러 조각(chunk)으로 나눠 받은 뒤 합쳐서 처리
-function route_(p) {
-  if (p && p.action === 'chunk') {
-    const cache = CacheService.getScriptCache();
-    const key = 'ck_' + String(p.id || '').slice(0, 40);
-    const n = Number(p.n), i = Number(p.i);
-    if (!(n > 0 && n <= 60 && i >= 0 && i < n)) return out_({ ok: false, error: 'bad chunk' });
-    cache.put(key + '_' + i, String(p.data || ''), 600);
-    if (i < n - 1) return out_({ ok: true, chunk: i });
-    let s = '';
-    for (let k = 0; k < n; k++) {
-      const part = cache.get(key + '_' + k);
-      if (part === null) return out_({ ok: false, error: 'chunk missing' });
-      s += part;
-    }
-    let q = {};
-    try { q = JSON.parse(s); } catch (err) { return out_({ ok: false, error: 'chunk parse' }); }
-    return handle_(q);
-  }
-  return handle_(p);
-}
-
-function out_(o) {
-  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
-}
-function sheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_NAME);
-    sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]);
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-function clean_(s, n) {
-  return String(s == null ? '' : s).replace(/^[=+\-@']+/, '').slice(0, n || 20);
-}
-function genCode_() {
-  let c = '';
-  for (let i = 0; i < 5; i++) c += CODE_CHARS.charAt(Math.floor(Math.random() * CODE_CHARS.length));
-  return c;
-}
-
-function handle_(p) {
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(20000)) return out_({ ok: false, error: '서버가 혼잡합니다. 잠시 후 다시 시도하세요.' });
-  try {
-    const now = Date.now();
-    const sh = sheet_();
-    const values = sh.getDataRange().getValues();
-    const rows = [];
-    for (let i = 1; i < values.length; i++) {
-      const r = { _row: i + 1 };
-      HEAD.forEach((h, j) => { r[h] = values[i][j]; });
-      rows.push(r);
-    }
-    const find = c => rows.find(r => String(r.code) === String(c || '').toUpperCase().trim());
-    const save = r => sh.getRange(r._row, 1, 1, HEAD.length)
-      .setValues([HEAD.map(h => (r[h] === undefined || r[h] === null) ? '' : r[h])]);
-    const pid = String(p.pid || '');
-    const member = r => !!pid && (String(r.host) === pid || String(r.guest) === pid);
-    const res = o => { o.now = now; return out_(o); };
-
-    switch (p.action) {
-      case 'ping':
-        return res({ ok: true });
-
-      case 'info': // 게임 공유용: 이 웹 앱의 주소
-        return res({ ok: true, url: ScriptApp.getService().getUrl() });
-
-      case 'list': { // 방 목록 (+ 오래된 방 정리)
-        const alive = [];
-        for (let i = rows.length - 1; i >= 0; i--) {
-          const r = rows[i];
-          if (now - Number(r.updated || 0) > ROOM_TTL_MIN * 60000) { sh.deleteRow(r._row); continue; }
-          if (r.status !== 'finished') {
-            alive.unshift({ code: r.code, name: r.name, hostName: r.hostName, guestName: r.guestName, status: r.status });
-          }
-        }
-        return res({ ok: true, rooms: alive });
-      }
-
-      case 'create': {
-        if (!pid) return res({ ok: false, error: '플레이어 ID가 없습니다.' });
-        let code;
-        do { code = genCode_(); } while (find(code));
-        const r = {
-          code: code, name: clean_(p.roomName, 24) || '주술 대전', host: pid, hostName: clean_(p.name, 16),
-          guest: '', guestName: '', guestDeck: '', status: 'waiting', turn: '', deadline: 0,
-          version: 0, updated: now, left: '', state: ''
-        };
-        sh.appendRow(HEAD.map(h => r[h]));
-        return res({ ok: true, code: code, role: 'host' });
-      }
-
-      case 'join': {
-        const r = find(p.code);
-        if (!r) return res({ ok: false, error: '방을 찾을 수 없습니다.' });
-        if (String(r.host) === pid) return res({ ok: true, role: 'host', code: r.code });
-        if (String(r.guest) === pid) return res({ ok: true, role: 'guest', code: r.code });
-        // 난입 / 관전 방어: 대기 중인 방에만, 빈 자리일 때만 입장 가능
-        if (r.status !== 'waiting' || r.guest) {
-          return res({ ok: false, error: '이미 대전 중인 방입니다. (난입·관전 불가)' });
-        }
-        r.guest = pid;
-        r.guestName = clean_(p.name, 16);
-        r.guestDeck = String(p.deck || '[]').slice(0, 5000);
-        r.status = 'ready';
-        r.updated = now;
-        save(r);
-        return res({ ok: true, role: 'guest', code: r.code });
-      }
-
-      case 'room': { // 방/게임 상태 조회 (참가자만)
-        const r = find(p.code);
-        if (!r) return res({ ok: false, error: 'gone' });
-        if (!member(r)) return res({ ok: false, error: '대전 참가자만 접근할 수 있습니다. (관전 불가)' });
-        const o = {
-          ok: true, code: r.code, status: r.status, host: String(r.host), guest: String(r.guest),
-          hostName: r.hostName, guestName: r.guestName, version: Number(r.version || 0),
-          turn: String(r.turn || ''), deadline: Number(r.deadline || 0), left: String(r.left || '')
-        };
-        if (String(r.host) === pid) o.guestDeck = r.guestDeck;
-        if (o.version > Number(p.since || 0)) o.state = r.state;
-        return res(o);
-      }
-
-      case 'push': { // 게임 상태 업로드 (턴 잠금 + 버전 검사)
-        const r = find(p.code);
-        if (!r) return res({ ok: false, error: 'gone' });
-        if (!member(r)) return res({ ok: false, error: '대전 참가자가 아닙니다.' });
-        if (r.status === 'finished') return res({ ok: false, error: 'finished' });
-        const v = Number(r.version || 0);
-        if (Number(p.version) !== v) return res({ ok: false, error: 'conflict', version: v });
-        if (r.turn && String(r.turn) !== pid) {
-          // Turn Lock: 상대 턴에는 조작 불가. 단, 제한시간이 지나면 자동 턴 넘김 허용
-          const timeoutOk = (p.timeout == 1 || p.timeout === true) && now > Number(r.deadline || 0);
-          if (!timeoutOk) return res({ ok: false, error: 'turnlock' });
-        }
-        r.state = String(p.state || '');
-        r.version = v + 1;
-        r.updated = now;
-        if (p.nextTurn && String(p.nextTurn) !== String(r.turn)) {
-          r.turn = String(p.nextTurn);
-          r.deadline = now + TURN_SEC * 1000;
-        }
-        if (p.status) r.status = String(p.status);
-        save(r);
-        return res({ ok: true, version: r.version, deadline: Number(r.deadline), turn: r.turn });
-      }
-
-      case 'leave': {
-        const r = find(p.code);
-        if (!r) return res({ ok: true });
-        if (!member(r)) return res({ ok: false, error: '참가자가 아닙니다.' });
-        if (r.status === 'waiting') { sh.deleteRow(r._row); return res({ ok: true }); }
-        if (r.status !== 'finished') { r.left = pid; r.status = 'finished'; }
-        r.updated = now;
-        save(r);
-        return res({ ok: true });
-      }
-
-      default:
-        if (!p.action) {
-          // 브라우저에서 URL을 직접 열었을 때: 서버가 정상 동작 중임을 알려줌
-          return res({ ok: true, message: '주술결전 서버가 정상 동작 중입니다. 이 URL을 게임의 [온라인 대전 → 서버 설정]에 붙여넣으세요.' });
-        }
-        return res({ ok: false, error: 'unknown action: ' + p.action });
-    }
-  } catch (err) {
-    return out_({ ok: false, error: String(err) });
-  } finally {
-    lock.releaseLock();
-  }
-}
-</script>
 
 <script>
 'use strict';
@@ -3640,14 +3352,14 @@ document.addEventListener('click',e=>{if(swallowClick){swallowClick=false;e.stop
 /* =========================================================
    화면 전환
    ========================================================= */
-function show(id){$$('.screen').forEach(s=>s.classList.toggle('on',s.id===id));$('#qrBtn').style.display=(id==='home'||id==='lobby')?'':'none';hideDetail();hideMenu();
+function show(id){$$('.screen').forEach(s=>s.classList.toggle('on',s.id===id));$('#qrBtn').style.display=(id==='home'||id==='ghpr')?'':'none';hideDetail();hideMenu();
  if(id==='home')$('#homeDeckCnt').textContent=`덱 ${myDeck.length}장`;
  if(id==='deck')openDeck();
  if(id==='tutorial')renderTut();
- if(id==='lobby')openLobby();else stopLobby();
+ 
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;SFX.play('click');const g=b.dataset.go;
- if(g==='practice')startPractice();else if(g==='qrplay')quickInvite();else if(g==='ghpr')openGhpr();else show(g);});
+ if(g==='practice')startPractice();else if(g==='qrplay')prQuickInvite();else if(g==='ghpr')openGhpr();else show(g);});
 $('#btnSound').onclick=()=>{const on=SFX.toggle();updSndBtns();if(on)SFX.play('turn');};
 function updSndBtns(){$('#btnSound').textContent=SFX.on?'사운드 켜짐':'사운드 꺼짐';$('#bSnd').textContent=SFX.on?'소리 켬':'소리 끔';}
 
@@ -3680,7 +3392,7 @@ $('#dbSave').onclick=()=>{if(DB.sel.size<15){SFX.play('err');toast(`덱은 최�
    게임 엔진
    ========================================================= */
 let G=null,mySeat=0,MODE='ai',TG=null,busy=false,lastFx=0,pendingState=null,resultShown=false;
-const TURN_MS={ai:90000,online:60000,pr:150000};
+const TURN_MS={ai:90000,pr:150000};
 const CUTIN_MS=1750;
 const START_HP=80;
 
@@ -3903,11 +3615,10 @@ function act(type,a={}){
    P.main=null;fx({k:'destroy',s,u:meg.u});log(`[${cn(meg)}]이(가) 의식의 대가로 소멸했다…`,s,'kill');
    const M=mk('mahoraga');P.main=M;fx({k:'txt',s,u:M.u,t:'마허라 강림',c:'unlock'});fx({k:'sfx',n:'heavy'});
    log('팔악검 이계신장 마허라가 강림했다! 법륜이 적응을 시작한다.',s,'ult');break;}
-  case 'end':{endTurn(!!a.timeout);if(MODE==='online')NET.deadline=Date.now()+NET.off+TURN_MS.online;break;}
+  case 'end':{endTurn(!!a.timeout);break;}
  }
  synCheck();
  commit(prev);
- if(MODE==='online')queuePush();
  if(MODE==='pr'&&(type==='end'||G.winner!=null))prQueuePush();
  if(type!=='end'&&G.winner==null&&G.turn===s&&!isAITurn()){
   if(P.ap.s<=0&&(P.ap.m<=0||!canMain(P)))autoEnd(s,tn);
@@ -4087,14 +3798,13 @@ let lastTick=-1;
 setInterval(()=>{
  if(!G||!$('#battle').classList.contains('on'))return;
  const total=TURN_MS[MODE];
- let remain=MODE==='online'?NET.deadline-(Date.now()+NET.off):G.deadline-Date.now();
+ let remain=G.deadline-Date.now();
  if(G.winner!=null)remain=total;
  const sec=Math.max(0,Math.ceil(remain/1000));
  $('#tsec').textContent=sec;$('#tbar').style.width=Math.max(0,Math.min(100,remain/total*100))+'%';$('#timer').classList.toggle('warn',sec<=10&&G.winner==null);
  if(G.winner!=null)return;
  if(sec<=5&&sec>0&&sec!==lastTick&&G.turn===mySeat){SFX.play('tick');}lastTick=sec;
  if(remain<=0&&G.turn===mySeat&&!busy&&!isAITurn()){TG=null;hideMenu();act('end',{timeout:1});}
- if(MODE==='online'&&G.turn!==mySeat&&remain<-6000&&!NET.claimed&&!NET.pushing)claimTimeout();
  if(MODE==='pr'&&G.turn!==mySeat&&remain<-15000&&!busy&&!PR.pushing)prClaim();
 },250);
 
@@ -4107,7 +3817,6 @@ function showResult(extra){
  $('#rHome').onclick=()=>{$('#result').classList.remove('on');leaveBattle();};
 }
 function leaveBattle(){
- if(MODE==='online'&&NET.code){const code=NET.code;api('leave',{code}).catch(()=>{});stopNet();}
  if(MODE==='pr')prLeave();
  clearTimeout(aiT);aiT=null;G=null;TG=null;busy=false;pendingState=null;$('#result').classList.remove('on');show('home');
 }
@@ -4126,7 +3835,7 @@ function aiDeck(){
 }
 function startPractice(){
  if(myDeck.length<15){toast('덱이 15장 미만입니다. 카드 설정에서 덱을 구성하세요.');show('deck');return;}
- MODE='ai';mySeat=0;stopNet();
+ MODE='ai';mySeat=0;
  newGame(myDeck,aiDeck(),LS.get('jjk_name','나'),'AI 주령술사','ai');
  enterBattle();
 }
@@ -4198,181 +3907,11 @@ function aiAttack(s){
 }
 
 /* =========================================================
-   온라인 (Google Sheets / Apps Script)
+   플레이어 정보 (온라인 대전에 쓰는 이름·ID, 이 기기에만 저장)
    ========================================================= */
-/* Apps Script(HtmlService)로 열렸으면 google.script.run 으로 서버와 직접 통신 */
-const GAS_RPC=!!(window.google&&google.script&&google.script.run);
-/* GitHub Pages 등 사이트에서 게임을 열 때 쓰는 기본 온라인 대전 서버 주소 (Apps Script 웹 앱 …/exec).
-   비워 두면 [온라인 대전 → 서버 설정]에서 입력한 주소를 쓰고, 초대 QR에 담긴 서버 주소도 받아들입니다. */
-const JJK_SERVER_URL='';
-const isGasUrl=u=>/^https:\/\/script\.google(usercontent)?\.com\/[^\s"'<>]+$/.test(String(u||''));
-const NET={mode:null,lastErr:null,url:GAS_RPC?'rpc':(LS.get('jjk_url','')||(isGasUrl(JJK_SERVER_URL)?JJK_SERVER_URL:'')),pid:LS.get('jjk_pid',null),name:LS.get('jjk_name',''),code:null,role:null,ver:0,off:0,deadline:0,pollT:null,pushing:false,dirty:false,claimed:false,lobbyT:null,active:false};
+const NET={pid:LS.get('jjk_pid',null),name:LS.get('jjk_name','')};
 if(!NET.pid){NET.pid='p'+Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);LS.set('jjk_pid',NET.pid);}
 if(!NET.name){NET.name='주술사'+(100+rnd(900));LS.set('jjk_name',NET.name);}
-function rpc(body){return new Promise((res,rej)=>{google.script.run.withSuccessHandler(t=>{try{res(typeof t==='string'?JSON.parse(t):t)}catch(e){rej(e)}}).withFailureHandler(e=>rej(new Error((e&&e.message)||String(e)))).apiCall(JSON.stringify(body));});}
-async function api(action,p={}){
- if(!NET.url)throw new Error('서버 URL이 설정되지 않았습니다');
- const body={action,pid:NET.pid,name:NET.name,...p};
- const t0=Date.now();let j=null;
- if(GAS_RPC){j=await rpc(body);NET.mode='rpc';if(j&&j.now){const rtt=Date.now()-t0;NET.off=j.now-(t0+rtt/2);}return j;}
- if(NET.mode!=='jsonp'){
-  try{
-   const r=await fetch(NET.url,{method:'POST',body:JSON.stringify(body)});
-   const txt=await r.text();
-   try{j=JSON.parse(txt);}catch(e){NET.lastErr=/^\s*</.test(txt)?'HTML':'BADJSON';j=null;}
-   if(j)NET.mode='fetch';
-  }catch(e){NET.lastErr='FETCH:'+(e.message||e);j=null;}
- }
- if(!j){j=await jsonpSend(body);NET.mode='jsonp';}
- if(j&&j.now){const rtt=Date.now()-t0;NET.off=j.now-(t0+rtt/2);}
- return j;
-}
-/* 호환 방식: <script> 태그로 GET 요청 (CORS 제한을 받지 않음). 큰 데이터는 조각으로 나눠 전송 */
-let jsonpSeq=0;
-function jsonp(q){return new Promise((res,rej)=>{
- const cb='__jjk'+Date.now().toString(36)+(jsonpSeq++);const sc=document.createElement('script');
- const done=()=>{clearTimeout(t);try{delete window[cb]}catch(_){window[cb]=undefined}sc.remove();};
- const t=setTimeout(()=>{done();rej(new Error('JSONP_TIMEOUT'))},20000);
- window[cb]=d=>{done();res(d)};
- sc.onerror=()=>{done();rej(new Error('JSONP_FAIL'))};
- sc.src=NET.url+(NET.url.includes('?')?'&':'?')+'q='+encodeURIComponent(q)+'&callback='+cb;
- document.head.appendChild(sc);});}
-async function jsonpSend(body){
- const q=JSON.stringify(body);const LIM=5000;
- if(encodeURIComponent(q).length<=LIM)return jsonp(q);
- const parts=[];let cur='',len=0;
- for(const ch of q){const l=encodeURIComponent(ch).length;if(len+l>LIM-600){parts.push(cur);cur='';len=0;}cur+=ch;len+=l;}
- if(cur)parts.push(cur);
- const id=NET.pid+'_'+Date.now().toString(36)+'_'+rnd(1e6);let r=null;
- for(let i=0;i<parts.length;i++){r=await jsonp(JSON.stringify({action:'chunk',id,i,n:parts.length,data:parts[i]}));if(!r||!r.ok)return r;}
- return r;
-}
-function netDiag(e){
- const m=String(e&&e.message||e||'');const tips=[];
- const framed=window.top!==window.self;
- if(framed)tips.push('[가장 유력한 원인] 지금 게임이 다른 앱의 미리보기 창 안에서 열려 있습니다. 미리보기 창은 외부 서버 연결을 막습니다. index.html 파일을 내려받아 크롬·엣지에서 직접 연 뒤 다시 시도하세요.');
- if(NET.lastErr==='HTML'||(m==='JSONP_FAIL'&&!framed))tips.push('서버가 데이터 대신 로그인 페이지를 돌려줬습니다. Apps Script [배포 관리]에서 액세스 권한을 "모든 사용자"로 바꾸세요. 학교·회사 계정은 관리자 정책 때문에 "모든 사용자"를 고를 수 없을 수 있으니, 그때는 개인 Gmail 계정으로 시트를 만들어 배포하세요.');
- if(m==='JSONP_TIMEOUT')tips.push('서버 응답이 20초 안에 오지 않았습니다. 잠시 후 다시 시도하세요.');
- if(/unknown action/.test(m)||m==='bad chunk')tips.push('서버 코드가 예전 버전입니다. 새 코드를 붙여넣고 [배포 관리 → 새 버전]으로 다시 배포하세요.');
- if(!tips.length)tips.push('URL이 /exec 로 끝나는지, 배포 액세스가 "모든 사용자"인지 확인하세요.');
- return `연결 실패 (${m||NET.lastErr||'알 수 없음'})\n· `+tips.join('\n· ');
-}
-function openLobby(){
- $('#inName').value=NET.name;
- $('#deckState').textContent=myDeck.length>=15?`사용 덱: ${myDeck.length}장`:'덱이 15장 미만입니다 — 카드 설정에서 구성하세요';
- $('#deckState').className='srvstate '+(myDeck.length>=15?'ok':'bad');
- updSrvState();
- if(!NET.url){openSrv();}
- refreshRooms();stopLobby();NET.lobbyT=setInterval(()=>{if(!$('#waitModal').classList.contains('on'))refreshRooms();},3000);
-}
-function stopLobby(){clearInterval(NET.lobbyT);NET.lobbyT=null;}
-function updSrvState(){const e=$('#srvState');if(GAS_RPC){e.textContent='Google 서버에 자동 연결됨';e.className='srvstate ok';$('#btnSrv').style.display='none';return;}if(NET.url){e.textContent='서버 URL 설정됨';e.className='srvstate ok';}else{e.textContent='서버 미설정 — [서버 설정]을 눌러주세요';e.className='srvstate bad';}}
-$('#inName').onchange=()=>{const v=$('#inName').value.trim().slice(0,12);if(v){NET.name=v;LS.set('jjk_name',v);toast('닉네임 저장: '+v);}};
-let listBusy=false;
-async function refreshRooms(){
- if(!NET.url||listBusy)return;listBusy=true;
- try{const j=await api('list');if(!j.ok)throw new Error(j.error);
-  const L=$('#roomList');
-  if(!j.rooms.length)L.innerHTML='<div class="empty">열린 방이 없습니다. 방을 만들어보세요!</div>';
-  else L.innerHTML=j.rooms.map(r=>{const open=r.status==='waiting';return `<div class="room"><span class="rcode">${esc(r.code)}</span><button class="btn" data-copy="${esc(r.code)}" style="padding:4px 8px;font-size:12px" title="방 코드 복사"></button><div style="flex:1;min-width:0"><div class="rname">${esc(r.name)}</div><div class="rhost">방장: ${esc(r.hostName)}${r.guestName?' · VS '+esc(r.guestName):''}</div></div><span class="rst ${esc(r.status)}">${open?'참가 가능':'대전 중'}</span><button class="btn ${open?'pri':''}" data-join="${esc(r.code)}" ${open?'':'disabled title="이미 대전 중인 방은 난입·관전할 수 없습니다"'}>${open?'참가':'입장 불가'}</button></div>`}).join('');
-  $('#lastUpd').textContent='자동 갱신 · '+new Date().toLocaleTimeString();
- }catch(e){$('#roomList').innerHTML=`<div class="empty">서버에 연결할 수 없습니다.<br><small>${esc(e.message||e)}</small></div>`;}
- listBusy=false;
-}
-$('#roomList').onclick=e=>{const c=e.target.closest('[data-copy]');if(c){copyText(c.dataset.copy);return;}const j=e.target.closest('[data-join]');if(j&&!j.disabled)joinRoom(j.dataset.join);};
-$('#btnRefresh').onclick=()=>refreshRooms();
-$('#btnCreate').onclick=()=>createRoom();
-$('#btnJoin').onclick=()=>{const c=$('#inCode').value.trim().toUpperCase();if(c.length<5){toast('5자리 방 코드를 입력하세요');return;}joinRoom(c);};
-$('#inCode').onkeydown=e=>{if(e.key==='Enter')$('#btnJoin').click();};
-function lobbyReady(){if(!NET.url){openSrv();return false;}if(myDeck.length<15){myDeck=DEFAULT_DECK.slice();LS.set('jjk_deck',myDeck);toast('덱이 15장 미만이라 추천 덱으로 대전합니다.');}const v=$('#inName').value.trim();if(v){NET.name=v.slice(0,12);LS.set('jjk_name',NET.name);}return true;}
-async function createRoom(){
- if(!lobbyReady())return;$('#btnCreate').disabled=true;
- try{const j=await api('create',{roomName:$('#inRoom').value.trim()||`${NET.name}의 방`});if(!j.ok)throw new Error(j.error);
-  NET.code=j.code;NET.role='host';NET.ver=0;openWait(true);startNet();SFX.play('place');
- }catch(e){toast('방 만들기 실패: '+(e.message||e));}
- $('#btnCreate').disabled=false;
-}
-async function joinRoom(code){
- if(!lobbyReady())return;
- try{const j=await api('join',{code,deck:JSON.stringify(myDeck)});if(!j.ok){SFX.play('err');toast(j.error);refreshRooms();return;}
-  NET.code=j.code;NET.role=j.role;NET.ver=0;openWait(j.role==='host');startNet();SFX.play('place');
- }catch(e){toast('참가 실패: '+(e.message||e));}
-}
-/* 방장 대기 화면에 초대 QR을 바로 표시: 친구는 기본 카메라로 한 번 찍으면 자동 참가 */
-async function fillWaitQR(){const box=$('#waitQRBox');box.innerHTML='<div class="loading"></div>';
- try{const base=await shareBase();if(!NET.code||NET.role!=='host')return;const url=inviteURL(base,NET.code);box.innerHTML=qrSVG(url);
-  $('#waitMsg').textContent='친구가 휴대폰 카메라로 이 QR을 찍으면 바로 대전이 시작됩니다. (방 코드를 알려줘도 됩니다)';}catch(e){box.innerHTML='';}}
-async function quickInvite(){if(!NET.url){show('lobby');return;}show('lobby');$('#inRoom').value=`${NET.name}의 QR 대전`;await createRoom();}
-function openWait(host){$('#waitQRBox').innerHTML='';if(host)setTimeout(fillWaitQR,0);$('#waitModal').classList.add('on');$('#waitCode').textContent=NET.code;$('#waitTitle').textContent=host?'상대를 기다리는 중...':'대전 준비 중...';$('#waitMsg').textContent=host?'방 코드를 친구에게 공유하세요. 상대가 입장하면 자동으로 시작합니다.':'방장이 대전을 준비하고 있습니다. 잠시만 기다려주세요.';}
-function closeWait(){$('#waitModal').classList.remove('on');}
-$('#waitCopy').onclick=()=>copyText(NET.code||'');
-$('#waitCancel').onclick=()=>{const code=NET.code;if(code)api('leave',{code}).catch(()=>{});stopNet();closeWait();refreshRooms();};
-function startNet(){stopNetTimer();NET.active=true;netLoop();}
-function stopNetTimer(){clearTimeout(NET.pollT);NET.pollT=null;}
-function stopNet(){NET.active=false;stopNetTimer();NET.code=null;NET.role=null;NET.ver=0;NET.dirty=false;NET.claimed=false;}
-async function netLoop(){
- if(!NET.active||!NET.code)return;
- const code=NET.code;
- try{const j=await api('room',{code,since:NET.ver});if(NET.active&&NET.code===code)handleRoom(j);}catch(e){}
- if(NET.active&&NET.code===code)NET.pollT=setTimeout(netLoop,G?1400:1800);
-}
-function handleRoom(j){
- if(!j.ok){if(j.error==='gone'){toast('방이 사라졌습니다.');if(!G||G.winner!=null){stopNet();closeWait();}}else toast(j.error);return;}
- if(j.deadline)NET.deadline=j.deadline;
- if(!G||G.mode!=='online'){
-  if(j.status==='finished'){closeWait();stopNet();toast('상대가 방을 나갔습니다.');refreshRooms();return;}
-  if(NET.role==='host'&&j.status==='ready'&&j.guestDeck&&!j.state){
-   let gd=[];try{gd=JSON.parse(j.guestDeck).filter(id=>CARDS[id]);}catch(e){}
-   if(gd.length<15)gd=DEFAULT_DECK.slice();
-   MODE='online';mySeat=0;newGame(myDeck,gd,NET.name,j.guestName||'상대','online');G.pids=[NET.pid,j.guest];
-   NET.ver=j.version;NET.deadline=Date.now()+NET.off+TURN_MS.online;closeWait();enterBattle();NET.dirty=true;doPush();
-   return;}
-  if(j.state){try{const ng=JSON.parse(j.state);const seat=ng.pids.indexOf(NET.pid);if(seat<0)return;NET.ver=j.version;MODE='online';mySeat=seat;G=ng;closeWait();enterBattle();}catch(e){}return;}
-  if(j.guestName)$('#waitMsg').textContent=`${j.guestName} 님이 입장했습니다! 대전을 시작합니다...`;
-  return;
- }
- if(j.state&&j.version>NET.ver){
-  let ng;try{ng=JSON.parse(j.state)}catch(e){ng=null}
-  NET.ver=j.version;
-  if(ng){const newer=ng.turnNo>G.turnNo||(ng.turnNo===G.turnNo&&ng.turn!==mySeat&&ng.fs>G.fs)||(ng.winner!=null&&G.winner==null&&ng.fs>G.fs);
-   if(newer){TG=null;hideMenu();if(busy)pendingState=ng;else applyIncoming(ng);}}
- }
- if(j.status==='finished'&&j.left&&j.left!==NET.pid&&G.winner==null){G.winner=mySeat;log('상대가 대전을 떠났습니다. 기권승!',-1,'sys');render();resultShown=true;showResult('상대가 대전을 떠났습니다. (기권승)');stopNet();}
-}
-function queuePush(){if(MODE!=='online'||!NET.code)return;NET.dirty=true;if(!NET.pushing)doPush();}
-async function doPush(timeout){
- if(NET.pushing)return;NET.pushing=true;
- while(NET.dirty&&NET.code){
-  NET.dirty=false;const st=JSON.stringify(G);
-  if(st.length>48000)console.warn('state large',st.length);
-  try{const j=await api('push',{code:NET.code,version:NET.ver,state:st,nextTurn:G.pids[G.turn],status:G.winner!=null?'finished':'playing',timeout:timeout?1:0});
-   if(j.ok){NET.ver=j.version;if(j.deadline)NET.deadline=j.deadline;}
-   else if(j.error==='conflict'||j.error==='turnlock'){await syncNow();}
-   else if(j.error!=='finished')toast('동기화 오류: '+j.error);
-  }catch(e){toast('네트워크 오류 — 재전송합니다');NET.dirty=true;await sleep(1500);}
- }
- NET.pushing=false;
- if(G&&G.winner!=null&&MODE==='online'){setTimeout(()=>{if(G&&G.winner!=null)stopNet();},500);}
-}
-async function syncNow(){try{const j=await api('room',{code:NET.code,since:0});if(!j.ok)return;if(j.deadline)NET.deadline=j.deadline;if(j.state){const ng=JSON.parse(j.state);NET.ver=j.version;if(busy)pendingState=ng;else await applyIncoming(ng);}}catch(e){}}
-async function claimTimeout(){
- NET.claimed=true;
- await syncNow();
- const remain=NET.deadline-(Date.now()+NET.off);
- if(!G||G.turn===mySeat||G.winner!=null||remain>-5000){NET.claimed=false;return;}
- const prev=snap();endTurn(true);NET.deadline=Date.now()+NET.off+TURN_MS.online;commit(prev);
- NET.dirty=true;await doPush(true);NET.claimed=false;
-}
-/* 서버 설정 */
-function openSrv(){$('#srvModal').classList.add('on');$('#inUrl').value=NET.url;$('#gsView').textContent=$('#gsSrc').textContent.trim();$('#urlTest').textContent='';}
-$('#btnSrv').onclick=openSrv;
-$('#closeSrv').onclick=()=>$('#srvModal').classList.remove('on');
-$('#copyGs').onclick=()=>copyText($('#gsSrc').textContent.trim());
-$('#saveUrl').onclick=async()=>{const u=$('#inUrl').value.trim();const t=$('#urlTest');
- if(!/^https:\/\/script\.google(usercontent)?\.com\//.test(u)){t.textContent='Apps Script 웹 앱 URL(https://script.google.com/macros/s/.../exec)을 입력하세요.';t.className='srvstate bad';return;}
- NET.url=u;LS.set('jjk_url',u);updSrvState();t.textContent='연결 테스트 중...';t.className='srvstate';
- NET.mode=null;NET.lastErr=null;try{const j=await api('ping');if(j.ok){t.textContent=NET.mode==='jsonp'?'연결 성공! (호환 방식으로 연결됨)':'연결 성공! 서버가 정상 동작합니다.';t.className='srvstate ok';refreshRooms();setTimeout(()=>$('#srvModal').classList.remove('on'),900);}else throw new Error(j.error);}
- catch(e){t.textContent=netDiag(e);t.className='srvstate bad';t.style.whiteSpace='pre-line';}};
 
 /* =========================================================
    튜토리얼
@@ -4480,21 +4019,19 @@ ${SYN.map(s=>`<tr><td>${esc(s.n)}</td><td>${s.m.map(id=>esc(CARDS[id].sn)).join(
 <tr><td>[턴 넘기기]</td><td>남은 행동을 버리고 상대 턴으로</td></tr></table>
 <h4>전투 로그</h4><p>왼쪽 전투 로그에 상대가 어떤 카드를 대기 필드에 냈는지, 어떤 마법을 발동했는지, 누구를 공격했는지 등 <b>모든 행동</b>이 실시간으로 기록됩니다. (파란 줄: 나 / 빨간 줄: 상대)</p>
 <h4>연출</h4><p>드로우 시 부채꼴 패 애니메이션, 필드 이동 궤적, 타격 이펙트와 화면 흔들림, 대미지 플로팅 텍스트, 궁극기 컷인이 재생됩니다. 효과음은 오른쪽 위 소리 버튼으로 켜고 끌 수 있습니다.</p>`],
-['온라인 대전',()=>`<h3>온라인 대전</h3>
-<h4>1. 서버 준비 (한 번만)</h4>
-<p>온라인 대전은 <b>Google Sheets + Apps Script</b>를 서버로 사용합니다. 로비의 <b>[서버 설정]</b> 안내에 따라 서버 코드를 배포하세요.</p>
-<ul><li><b>추천: URL 하나로 플레이</b> — Apps Script 프로젝트에 HTML 파일 <b>index</b>를 추가해 이 게임 파일 전체를 붙여넣고 배포하면, <b>웹 앱 URL을 여는 것만으로 게임이 실행</b>됩니다. 휴대폰(가로 화면)에서도 되고, 서버 설정 입력도 필요 없습니다. 친구에게는 그 URL만 보내면 됩니다.</li>
-<li>또는 index.html 파일을 크롬·엣지에서 직접 열고, 서버 설정에 웹 앱 URL을 입력해도 됩니다. 이때는 친구도 <b>같은 URL</b>을 입력해야 합니다.</li></ul>
-<h4>2. 방 만들기 / 참가</h4>
-<ul><li><b>방 만들기</b>: 5자리 방 코드가 생성됩니다. <b>버튼으로 원클릭 복사</b>해 친구에게 보내세요.</li>
-<li><b>참가</b>: 방 목록에서 [참가]를 누르거나, 방 코드를 직접 입력합니다.</li>
-<li>방 목록은 <b>3초마다 자동 갱신</b>됩니다.</li>
-<li><b>이미 대전 중인 방</b>은 표시되며 <b>난입·관전이 차단</b>됩니다. 대전 데이터는 두 참가자만 조회할 수 있습니다.</li></ul>
+['온라인 대전',()=>`<h3>온라인 대전 (GitHub PR·머지)</h3>
+<p>온라인 대전은 이 게임이 올라가 있는 <b>GitHub 저장소</b>에 대전 기록을 <b>PR로 올리고 머지</b>해서 주고받습니다. 별도 서버가 없습니다.</p>
+<h4>1. 준비 (처음 한 번)</h4>
+<ul><li>대전하는 사람은 모두 이 저장소의 <b>협업자(쓰기 권한)</b>여야 합니다. 저장소 주인이 <b>Settings → Collaborators</b>에서 초대합니다.</li>
+<li>각자 GitHub에서 <b>토큰</b>(Fine-grained token, 이 저장소의 Contents·Pull requests 읽기·쓰기)을 만들어 [온라인 대전] 화면에 저장합니다. 토큰은 그 기기에만 저장됩니다.</li></ul>
+<h4>2. 대전하기</h4>
+<ul><li>홈의 <b>[QR로 친구 초대]</b>를 누르면 방이 만들어지고 초대 QR이 뜹니다. 친구가 휴대폰 카메라로 찍으면 게임이 열리고 그 방에 참가합니다.</li>
+<li>방 코드 5자리를 알려주고 [온라인 대전]에서 코드로 참가해도 됩니다.</li></ul>
 <h4>3. 대전 중</h4>
-<ul><li><b>턴 잠금(Turn Lock)</b>: 상대 턴에는 모든 조작이 잠깁니다. 서버도 현재 턴 플레이어의 요청만 받아들입니다.</li>
-<li><b>제한시간 ${TURN_MS.online/1000}초</b>: 시간이 지나면 자동으로 턴이 넘어갑니다. 상대가 응답이 없으면 내 쪽에서 자동으로 턴을 가져옵니다.</li>
-<li>나가기 버튼으로 대전을 떠나면 <b>기권패</b> 처리됩니다.</li></ul>
-<div class="tip">Apps Script 특성상 동기화에 1~2초 정도 지연이 있을 수 있습니다.</div>`],
+<ul><li>방 만들기·참가·<b>턴 종료</b>·나가기 때마다 게임이 자동으로 브랜치 생성 → 커밋 → <b>PR → 머지</b>를 합니다. 기록은 사이트(main)가 아닌 별도 브랜치에 쌓입니다.</li>
+<li>상대 화면에는 턴이 끝날 때 그 턴의 행동이 한꺼번에 반영됩니다. PR 처리에 몇 초가 걸립니다.</li>
+<li><b>턴 잠금</b>: 상대 턴에는 조작할 수 없고, 같은 턴을 두 번 넘기면 하나만 반영됩니다. <b>제한시간 ${TURN_MS.pr/1000}초</b>가 지나면 턴이 넘어갑니다.</li>
+<li>이미 대전 중인 방은 <b>난입·관전이 차단</b>됩니다.</li></ul>`],
 ];
 let tutI=0;
 function renderTut(){$('#tutNav').innerHTML=TUT.map((t,i)=>`<button class="tab ${i===tutI?'on':''}" data-t="${i}">${i+1}. ${t[0]}</button>`).join('');$('#tutBody').innerHTML=`<div class="tutpage">${TUT[tutI][1]()}</div>`;$('#tutPrev').disabled=tutI===0;$('#tutNext').textContent=tutI===TUT.length-1?'연습 대전 시작':'다음';$('#tutorial').scrollTop=0;}
@@ -4503,45 +4040,31 @@ $('#tutPrev').onclick=()=>{if(tutI>0){tutI--;renderTut();}};
 $('#tutNext').onclick=()=>{if(tutI<TUT.length-1){tutI++;SFX.play('click');renderTut();}else startPractice();};
 
 /* =========================================================
-   QR 공유: 찍으면 게임이 열림 / 방 대기 중이면 그 방에 바로 참가
+   QR 공유: 사이트 주소 QR (찍으면 게임이 열림)
    ========================================================= */
-let SHARE_BASE=null;
-async function shareBase(){
- if(SHARE_BASE)return SHARE_BASE;
- if(GAS_RPC){let j=null;try{j=await api('info');}catch(e){}if(j&&j.ok&&j.url){SHARE_BASE=j.url;return SHARE_BASE;}
-  throw new Error('서버 코드가 예전 버전입니다. 새 apps_script.gs를 Code.gs에 붙여넣고 [배포 관리 → 새 버전]으로 다시 배포하세요.');}
- if(/^https?:$/.test(location.protocol))return location.origin+location.pathname;
- if(NET.url&&/^https:\/\//.test(NET.url))return NET.url;
- throw new Error('온라인 서버 URL이 연결되어 있어야 QR로 공유할 수 있습니다. [온라인 대전 → 서버 설정]에서 먼저 연결하세요.');
-}
+function shareBase(){return /^https?:$/.test(location.protocol)?location.origin+location.pathname:null;}
 function qrSVG(text){const q=qrcode(0,'M');q.addData(text,'Byte');q.make();return q.createSvgTag({cellSize:4,margin:3,scalable:true});}
-async function openQR(withRoom){
- const room=withRoom&&NET.code?NET.code:null;
- $('#qrModal').classList.add('on');$('#qrTitle').textContent=room?`방 ${room} 초대 QR`:'게임 공유 QR';
- $('#qrBox').innerHTML='<div class="loading"></div>';$('#qrUrl').textContent='';$('#qrNote').textContent='';$('#qrCopy').style.display='none';$('#qrInvite').style.display=room?'none':'';
- try{const base=await shareBase();const url=room?inviteURL(base,room):base;
-  $('#qrBox').innerHTML=qrSVG(url);$('#qrUrl').textContent=url;$('#qrCopy').style.display='';$('#qrCopy').onclick=()=>copyText(url);
-  $('#qrNote').textContent=(room?'휴대폰 카메라로 찍으면 게임이 열리고 이 방에 바로 참가합니다.':'휴대폰 카메라로 찍으면 게임이 열립니다.')+(location.protocol==='file:'?' (Apps Script에 게임 index 파일을 넣어 배포한 경우)':'');
- }catch(e){$('#qrBox').innerHTML='';$('#qrNote').textContent=e.message||String(e);}
+function openQR(){
+ $('#qrModal').classList.add('on');$('#qrTitle').textContent='게임 공유 QR';$('#qrInvite').style.display='';
+ const url=shareBase();
+ if(!url){$('#qrBox').innerHTML='';$('#qrUrl').textContent='';$('#qrCopy').style.display='none';$('#qrNote').textContent='사이트(GitHub Pages)에서 연 게임만 QR로 공유할 수 있습니다.';return;}
+ $('#qrBox').innerHTML=qrSVG(url);$('#qrUrl').textContent=url;$('#qrCopy').style.display='';$('#qrCopy').onclick=()=>copyText(url);
+ $('#qrNote').textContent='휴대폰 카메라로 찍으면 게임이 열립니다. 함께 대전하려면 [대전 초대 QR 만들기]를 누르세요.';
 }
-$('#qrBtn').onclick=()=>{SFX.play('click');openQR(!!NET.code);};
-$('#waitQr').onclick=()=>openQR(true);
+$('#qrBtn').onclick=()=>{SFX.play('click');openQR();};
 $('#qrClose').onclick=()=>$('#qrModal').classList.remove('on');
-$('#qrInvite').onclick=()=>{$('#qrModal').classList.remove('on');quickInvite();};
-/* QR로 열렸을 때: ?room=코드 가 있으면 그 방에 자동 참가 */
-/* 초대 주소: 게임 주소 + 방 코드 (+ 사이트에서 열었으면 서버 주소도 담아 친구 기기에 설정이 없어도 자동 연결) */
-function inviteURL(base,room){let u=base+(base.includes('?')?'&':'?')+'room='+room;if(!GAS_RPC&&/^https?:$/.test(location.protocol)&&isGasUrl(NET.url))u+='&srv='+encodeURIComponent(NET.url);return u;}
-function launchParams(cb){try{if(GAS_RPC&&google.script.url&&google.script.url.getLocation){google.script.url.getLocation(l=>cb((l&&l.parameter)||{}));return;}}catch(e){}
- try{cb(Object.fromEntries(new URLSearchParams(location.search)));}catch(e){cb({});}}
+$('#qrInvite').onclick=()=>{$('#qrModal').classList.remove('on');prQuickInvite();};
+/* 홈의 [QR로 친구 초대]: PR 대전 방을 바로 만들고 초대 QR 표시 */
+function prQuickInvite(){openGhpr();if(!PR.token){PR.pendingCreate=true;ghStatus('GitHub 토큰을 저장하면 바로 방을 만들고 초대 QR을 띄웁니다.',false);return;}if(!PR.code)$('#ghCreate').click();}
+$('#ghName').value=NET.name;
+$('#ghName').onchange=()=>{const v=$('#ghName').value.trim().slice(0,12);if(v){NET.name=v;LS.set('jjk_name',v);toast('닉네임 저장: '+v);}};
+/* 초대 QR로 열린 경우: ?ghroom=방코드 가 있으면 그 방에 자동 참가 */
+function launchParams(cb){try{cb(Object.fromEntries(new URLSearchParams(location.search)));}catch(e){cb({});}}
 launchParams(p=>{
- /* GitHub PR 대전 초대로 열린 경우 */
  if(p.ghroom){const c=String(p.ghroom).toUpperCase().replace(/[^A-Z]/g,'').slice(0,5);const rp=String(p.ghrepo||'');
   setTimeout(()=>{if(/^[\w.-]+\/[\w.-]+$/.test(rp))PR.repo=rp;openGhpr();$('#ghCode').value=c;
    if(PR.token)prJoin(c);else{PR.pendingJoin=c;$('#ghState').textContent='GitHub 토큰을 저장하면 방 '+c+'에 자동으로 참가합니다.';$('#ghState').className='srvstate bad';}},300);return;}
- /* 초대 QR로 열렸고 이 기기에 서버 설정이 없으면, QR에 담긴 서버 주소 사용 */
- if(!GAS_RPC&&p.srv&&isGasUrl(p.srv)){NET.url=p.srv;if(!LS.get('jjk_url',''))LS.set('jjk_url',p.srv);}
- const code=String(p.room||'').toUpperCase().replace(/[^A-Z]/g,'').slice(0,5);if(code.length!==5)return;
- show('lobby');$('#inCode').value=code;toast(`QR 초대: 방 ${code}에 참가합니다`);setTimeout(()=>joinRoom(code),600);});
+});
 
 /* =========================================================
    GitHub PR 대전
@@ -4610,7 +4133,7 @@ $('#ghSave').onclick=async()=>{const rp=$('#ghRepo').value.trim(),tk=$('#ghToken
  PR.repo=rp;PR.token=tk;ghStatus('연결 확인 중...');
  try{const r=await gh(`${GH_API}/repos/${rp}`);if(!r.permissions||!r.permissions.push)throw new Error('이 토큰으로는 저장소에 쓸 수 없습니다 (Contents·Pull requests 쓰기 권한, 협업자 여부 확인)');
   LS.set('jjk_ghrepo',rp);LS.set('jjk_ghtoken',tk);ghStatus('연결 성공! '+rp+'에 PR을 만들고 머지할 수 있습니다.',true);
-  if(PR.pendingJoin){const c=PR.pendingJoin;PR.pendingJoin=null;prJoin(c);}}
+  if(PR.pendingJoin){const c=PR.pendingJoin;PR.pendingJoin=null;prJoin(c);}else if(PR.pendingCreate){PR.pendingCreate=false;$('#ghCreate').click();}}
  catch(e){ghStatus('연결 실패: '+(e.message||e),false);}};
 function ghReady(){if(!PR.token){ghStatus('먼저 GitHub 토큰을 저장하세요.',false);return false;}if(myDeck.length<15){myDeck=DEFAULT_DECK.slice();LS.set('jjk_deck',myDeck);}return true;}
 function ghInviteURL(){const base=/^https?:$/.test(location.protocol)?location.origin+location.pathname:'';return base?`${base}?ghroom=${PR.code}&ghrepo=${encodeURIComponent(PR.repo)}`:'';}
