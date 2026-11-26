@@ -7,7 +7,7 @@
 <style>
   html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #05050a; overflow: hidden; touch-action: none; overscroll-behavior: none; }
   #screen {
-    display: block; width: 100vw; height: 100vh; outline: none; cursor: crosshair;
+    display: block; position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; outline: none; cursor: crosshair;
     image-rendering: pixelated; image-rendering: crisp-edges;
     -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; -webkit-tap-highlight-color: transparent;
   }
@@ -2396,18 +2396,34 @@ const view = { scale: 1, ox: 0, oy: 0, dpr: 1 };
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const W = Math.floor(window.innerWidth * dpr), H = Math.floor(window.innerHeight * dpr);
+  // 실제 보이는 영역 크기 (모바일 주소창 때문에 100vh와 다를 수 있음 → 캔버스 CSS 크기를 직접 맞춰 늘어남 방지)
+  const vv = window.visualViewport;
+  const cw = Math.round(vv ? vv.width : window.innerWidth), ch = Math.round(vv ? vv.height : window.innerHeight);
+  screen.style.width = cw + 'px'; screen.style.height = ch + 'px';
+  const W = Math.round(cw * dpr), H = Math.round(ch * dpr);
   screen.width = W; screen.height = H;
-  const s = Math.max(1, Math.floor(Math.min(W / VW, H / VH)));   // 게임 1픽셀 = 화면 s픽셀 (정수배)
+  const fit = Math.min(W / VW, H / VH);
+  const s = Math.max(1, Math.floor(fit));                         // 내부 해상도: 게임 1픽셀 = s픽셀 (정수배)
   if (s !== RES) {
     RES = s; buf.width = VW * RES; buf.height = VH * RES; g.imageSmoothingEnabled = false;
     if (onResChange) onResChange();
   }
-  view.scale = s; view.dpr = dpr;
-  view.ox = Math.floor((W - VW * s) / 2);
-  view.oy = Math.floor((H - VH * s) / 2);
+  // 고해상도 화면(배율 3 이상, 휴대폰 등)은 화면을 꽉 채우도록 비율 그대로 확대, 아니면 정수배로 또렷하게
+  const d = s >= 3 ? fit : s;
+  view.scale = d; view.dpr = dpr;
+  view.ox = Math.floor((W - VW * d) / 2);
+  view.oy = Math.floor((H - VH * d) / 2);
+}
+// 화면 좌표(CSS 픽셀) → 게임 좌표: 캔버스의 실제 표시 크기 기준으로 계산 (보이는 위치 = 눌리는 위치)
+function clientToLogical(cx, cy) {
+  const r = screen.getBoundingClientRect();
+  const kx = r.width ? screen.width / r.width : view.dpr, ky = r.height ? screen.height / r.height : view.dpr;
+  return { x: ((cx - r.left) * kx - view.ox) / view.scale, y: ((cy - r.top) * ky - view.oy) / view.scale };
 }
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 150));
+document.addEventListener('fullscreenchange', () => setTimeout(resize, 50));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', resize);
 resize();
 
 function present(shakeX, shakeY) {
@@ -2738,9 +2754,8 @@ window.addEventListener('mouseup', e => kUp('Mouse' + e.button));
 window.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); return false; }, { capture: true });
 screen.addEventListener('contextmenu', e => e.preventDefault());
 screen.addEventListener('mousemove', e => {
-  const r = screen.getBoundingClientRect();
-  Keys.mx = Math.floor(((e.clientX - r.left) * view.dpr - view.ox) / view.scale);
-  Keys.my = Math.floor(((e.clientY - r.top) * view.dpr - view.oy) / view.scale);
+  const p = clientToLogical(e.clientX, e.clientY);
+  Keys.mx = Math.floor(p.x); Keys.my = Math.floor(p.y);
   Keys.mouseMoved = true; Keys.realMouseT = performance.now();
 });
 window.addEventListener('blur', () => { for (const k of [...Keys.down]) kUp(k); });
@@ -6237,8 +6252,7 @@ const Touch = {
   },
   active() { const sc = Loop.scene; return sc instanceof Battle && !sc.pauseMenu && !sc.resultMenu; },
   toLogical(t) {
-    const r = screen.getBoundingClientRect();
-    return { x: ((t.clientX - r.left) * view.dpr - view.ox) / view.scale, y: ((t.clientY - r.top) * view.dpr - view.oy) / view.scale };
+    return clientToLogical(t.clientX, t.clientY);
   },
   start(t) {
     const p = this.toLogical(t);
