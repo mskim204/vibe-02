@@ -4234,7 +4234,9 @@ class Fighter {
     if (this.vy >= 0) {
       let landY = null, landOn = null;
       if (this.y >= FLOOR_Y) { landY = FLOOR_Y; landOn = 'floor'; }
-      if (this.dropT === 0 && this.state !== 'airhit') {
+      // 스킬 사용 중이거나 콤보를 이어가는 중(상대가 내 콤보에 맞는 중)에는 발판을 통과 → 발판 착지로 콤보가 끊기지 않음
+      const passPlat = (this.state === 'attack' && this.move && this.move.skill) || (this.opp && this.opp.combo > 0);
+      if (this.dropT === 0 && this.state !== 'airhit' && !passPlat) {
         for (const p of this.map.plats) {
           if (prevY <= p.y && this.y >= p.y && this.x + PB > p.x && this.x - PB < p.x + p.w) {
             if (landY === null || p.y < landY) { landY = p.y; landOn = p; }
