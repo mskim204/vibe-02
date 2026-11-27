@@ -202,12 +202,12 @@ const TECH_ORDER = ['mid', 'up', 'down'];
 // ----------------------------------------------------------------- 무기 설정 (로드아웃)
 /* 기본 무기 1개(검, 고정) + 특수 스킬 2칸. 각 특수 스킬은 정해진 칸(slot 0 = 1번 칸, 1 = 2번 칸)에만 장착된다.
    규칙: 특수 스킬을 쓰는 턴에는 검 공격을 할 수 없고, 다 쓴 특수 스킬은 SP_COOLDOWN 턴 동안 다시 쓸 수 없다. */
-const SP_COOLDOWN = 2, HEAL_TURNS = 3, HEAL_AMOUNT = 50, GUN_MAX = 3;
+const SP_COOLDOWN = 2, HEAL_TURNS = 3, HEAL_AMOUNT = 50, GUN_MAX = 3, COUNTER_DMG = 10;
 const SPECIALS = {
   heal:  { id: 'heal',  slot: 0, name: '회복',      color: '#2f9e5b', desc: `${HEAL_TURNS}턴 연속 모으면 체력 +${HEAL_AMOUNT}`,
            detail: '모으는 중에 맞거나 다른 행동을 하면 처음부터' },
-  guard: { id: 'guard', slot: 0, name: '철벽 방어', color: '#b07a0e', desc: '이번 턴 바라보는 쪽 공격을 막음',
-           detail: '등 뒤에서 오는 공격은 막지 못함' },
+  guard: { id: 'guard', slot: 0, name: '철벽 방어', color: '#b07a0e', desc: `앞쪽 공격을 막고 반격 ${COUNTER_DMG}`,
+           detail: '막아 내면 공격한 상대에게 작은 반격 · 등 뒤 공격은 막지 못함' },
   gun:   { id: 'gun',   slot: 1, name: '랜덤 건',   color: '#7a4fd1', desc: `장전(최대 ${GUN_MAX}발) 후 발사 · 같은 층 멀리`,
            detail: '대미지 25부터 무작위, 탄이 많을수록 최대치 증가 · 장전 중 맞으면 탄 초기화', box: [0, 390, -95, -20] },
   whirl: { id: 'whirl', slot: 1, name: '회전 베기', color: '#c2551f', desc: '같은 층 양옆을 동시에 벰 · 대미지 20',
@@ -1069,7 +1069,12 @@ function resolveClash() {
   };
   const outcome = (att, def, r) => {
     if (r.hit) hitTarget(att, def, r.dmg);
-    else if (r.blocked) { floatAt(def, '막음!', SPECIALS.guard.color, -20, 30); Sfx.guard(); }
+    else if (r.blocked) {   // 철벽 방어 성공 → 공격한 쪽에 작은 반격
+      floatAt(def, '막음!', SPECIALS.guard.color, -20, 30); Sfx.guard();
+      att.hp = Math.max(0, att.hp - COUNTER_DMG); att.pose = 'hit'; att.poseT = 0; att.flash = 0.4; def.hits++;
+      B.floaters.push({ x: att.pos.x, y: att.pos.y - 150, text: `반격 -${COUNTER_DMG}`, color: SPECIALS.guard.color, size: 32, t: 0, life: 1.9 });
+      B.fx.push({ type: 'tracer', x0: def.pos.x + def.facing * 30, y0: def.pos.y - 60, x1: att.pos.x, y1: att.pos.y - 60, t: 0, life: 0.4, color: SPECIALS.guard.color });
+    }
     else if (r.attack) missAt(att, r);
   };
   outcome(p, ai, rp); outcome(ai, p, ra);
@@ -1101,18 +1106,18 @@ function resolveClash() {
     }
     if (sp && (sp.id === 'guard' || sp.id === 'whirl')) f.cd[a.slot] = SP_COOLDOWN;
   };
-  updateSpecial(p, !!ra.hit); updateSpecial(ai, !!rp.hit);
+  updateSpecial(p, !!(ra.hit || rp.blocked)); updateSpecial(ai, !!(rp.hit || ra.blocked));   // 반격을 맞아도 '맞음'으로 처리
 
   let msg, col;
   if (rp.hit && ra.hit) { msg = '상호 명중!'; col = C.gold; }
   else if (rp.hit) { msg = '명중! 예측 성공'; col = C.p1; }
   else if (ra.hit) { msg = `피격! ${OPP()}에게 읽혔다`; col = C.ai; }
-  else if (rp.blocked || ra.blocked) { msg = '방어 성공!'; col = SPECIALS.guard.color; }
+  else if (rp.blocked || ra.blocked) { msg = '방어 성공! 반격'; col = SPECIALS.guard.color; }
   else if (!rp.attack && !ra.attack) { msg = '서로 공격하지 않음'; col = C.sub; }
   else { msg = '양측 모두 빗나감!'; col = C.sub; }
   B.resultText = { msg, col, t: 0 };
-  const txt = (r, f, key) => statusLog[key] || (r.hit ? '명중' : r.blocked ? '막힘' : r.attack ? 'MISS' : actionShort(f));
-  B.log.unshift({ turn: B.turn, pHit: !!rp.hit, aHit: !!ra.hit, pTxt: txt(rp, p, 'p'), aTxt: txt(ra, ai, 'a') });
+  const txt = (r, f, key, other) => statusLog[key] || (r.hit ? '명중' : r.blocked ? '막힘' : other.blocked ? '반격' : r.attack ? 'MISS' : actionShort(f));
+  B.log.unshift({ turn: B.turn, pHit: !!rp.hit, aHit: !!ra.hit, pTxt: txt(rp, p, 'p', ra), aTxt: txt(ra, ai, 'a', rp) });
   if (B.log.length > 7) B.log.pop();
   // 다음 작전 페이즈용 잔상
   B.ghost = { pos: vcopy(ai.pos), facing: ai.facing, rects: actionRects(ai).map(r => Object.assign({}, r)), label: actionName(ai) };
@@ -1572,9 +1577,9 @@ function renderTouchPad() {
     const y = 532 + i * 22;
     text(`T${l.turn}`, rx + 14, y, 12, C.sub, 'left', 700);
     text(ME(), rx + 48, y, 12, C.p1, 'left', 800);
-    text(l.pHit ? '명중' : 'MISS', rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
+    text(l.pTxt || (l.pHit ? '명중' : 'MISS'), rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
     text(OPP(), rx + 124, y, 12, C.ai, 'left', 800);
-    text(l.aHit ? '명중' : 'MISS', rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
+    text(l.aTxt || (l.aHit ? '명중' : 'MISS'), rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
   });
 }
 
@@ -1933,7 +1938,7 @@ const TUT_PAGES = [
       `특수 스킬을 쓰는 턴에는 검 공격을 할 수 없고, 다 쓴 스킬은 ${SP_COOLDOWN}턴 동안 다시 쓸 수 없습니다.`,
       `회복: ${HEAL_TURNS}턴 연속으로 모으면 체력 +${HEAL_AMOUNT}. 모으는 중에 맞거나 다른 행동을 하면 처음부터입니다.`,
       `랜덤 건: 한 턴에 1발씩 장전(최대 ${GUN_MAX}발), 발사하면 같은 층 앞쪽 멀리까지. 대미지는 25부터 무작위이고 탄이 많을수록 최대치가 커집니다(1발 25~40 · 3발 25~70). 장전 중 맞으면 탄이 사라집니다.`,
-      '철벽 방어는 바라보는 쪽 공격을 막고, 회전 베기는 같은 층 양옆을 동시에 벱니다(20).'
+      `철벽 방어는 바라보는 쪽 공격을 막고 공격한 상대에게 반격 ${COUNTER_DMG}을 줍니다. 회전 베기는 같은 층 양옆을 동시에 벱니다(20).`
     ],
     draw(x, y, w, h, t) {
       const g = miniStage(x + 30, y + 30, w - 60, h - 60, []);
