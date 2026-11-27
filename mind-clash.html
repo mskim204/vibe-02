@@ -191,16 +191,30 @@ const WEAPONS = {
       up:   { name: '올려베기', key: '2', box: [-10, 150, -262, -104], swing: [1.1, -2.0], damage: 25, desc: '한 층 위만 (같은 층 X)' },
       down: { name: '내려베기', key: '3', box: [-10, 150, 6, 140],  swing: [-1.5, 1.6], damage: 25, desc: '한 층 아래만 (같은 층 X)' }
     }
-  },
-  // ---- 추후 업데이트 예정 무기 (잠김) ----
-  spear: { id: 'spear', name: '창', locked: true, desc: '길고 가는 찌르기', blade: 95,
-    techs: { mid: { name: '찌르기', box: [0, 290, -80, -40], swing: [0, 0], damage: 25 } } },
-  greatsword: { id: 'greatsword', name: '대검', locked: true, desc: '넓은 범위, 고위력', blade: 80,
-    techs: { mid: { name: '내려치기', box: [-20, 160, -200, 20], swing: [-2, 1], damage: 35 } } },
-  bow: { id: 'bow', name: '활', locked: true, desc: '멀리 날아가는 화살', blade: 0,
-    techs: { mid: { name: '사격', box: [60, 560, -70, -50], swing: [0, 0], damage: 15 } } }
+  }
 };
 const TECH_ORDER = ['mid', 'up', 'down'];
+
+// ----------------------------------------------------------------- 무기 설정 (로드아웃)
+/* 기본 무기 1개(검, 고정) + 특수 무기 2칸(교체 가능).
+   SPECIALS 에 특수 무기를 정의하면 무기 설정 화면의 목록에 자동으로 나타난다. (현재는 비어 있음)
+   예) SPECIALS.example = { id: 'example', name: '이름', desc: '설명' };                     */
+const SPECIALS = {};
+const LOADOUT_KEY = 'mindclash.loadout.v1';
+const loadout = { base: 'sword', special: [null, null] };
+(function loadLoadout() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LOADOUT_KEY) || 'null');
+    if (d && Array.isArray(d.special)) loadout.special = [0, 1].map(i => (d.special[i] && SPECIALS[d.special[i]]) ? d.special[i] : null);
+  } catch (e) {}
+})();
+function saveLoadout() { try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(loadout)); } catch (e) {} }
+function setSpecial(slot, id) {
+  if (id !== null && !SPECIALS[id]) return;
+  if (id !== null && loadout.special[1 - slot] === id) loadout.special[1 - slot] = null;   // 같은 무기 중복 장착 방지
+  loadout.special[slot] = id; saveLoadout();
+}
+const specialName = id => (id && SPECIALS[id] ? SPECIALS[id].name : '없음');
 function techRect(pos, facing, weaponId, techId) {
   const b = WEAPONS[weaponId].techs[techId].box;
   const x0 = facing > 0 ? pos.x + b[0] : pos.x - b[1];
@@ -678,6 +692,8 @@ let B = null;
 let tutPage = 0, tutT = 0;
 
 function goHome() { if (B && B.online) netLeave(); netCancelRoom(); scene = 'home'; paused = false; B = null; releaseAllHolds(); }
+let loSlot = 0;   // 무기 설정 화면에서 선택한 특수 무기 칸
+function enterLoadout() { scene = 'loadout'; paused = false; loSlot = 0; }
 function enterTutorial() { scene = 'tutorial'; paused = false; tutPage = 0; tutT = 0; }
 function tutGo(d) {
   const n = clamp(tutPage + d, 0, TUT_PAGES.length - 1);
@@ -693,6 +709,7 @@ function onKeyPress(k) {
   if (k === 'Escape') {
     if ((scene === 'battle' && B && B.phase !== 'over') || scene === 'tutorial') { paused = !paused; Sfx.ui(); }
     else if (scene === 'online') { netCancelRoom(); goHome(); }
+    else if (scene === 'loadout') goHome();
     return;
   }
   if (paused) return;
@@ -708,6 +725,9 @@ function onKeyPress(k) {
       if (k === 'Digit3' || k === 'Numpad3') setTech('down');
     }
     if (k === 'KeyR' && B.phase === 'over' && B.overT > 1 && !B.online) startBattle();
+  } else if (scene === 'loadout') {
+    if (k === 'Digit1' || k === 'Numpad1') loSlot = 0;
+    if (k === 'Digit2' || k === 'Numpad2') loSlot = 1;
   } else if (scene === 'tutorial') {
     if (k === 'ArrowRight' || k === 'KeyD' || k === 'Enter') tutGo(1);
     if (k === 'ArrowLeft' || k === 'KeyA') tutGo(-1);
@@ -1220,7 +1240,7 @@ function renderSidePanels() {
   text(plan ? `${OPP()}의 이동과 공격은 비공개` : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 470, 11, C.dim, 'center', 600);
   const td = WEAPONS[p.weapon].techs[p.tech];
   text(`${td.name}: ${td.desc}`, lx + lw / 2, 494, 11, C.p1, 'center', 700);
-  text('무기: 검 (다른 무기는 추후 업데이트)', lx + lw / 2, 522, 10.5, C.dim, 'center', 600);
+  text(`기본: 검 · 특수: ${specialName(loadout.special[0])} / ${specialName(loadout.special[1])}`, lx + lw / 2, 522, 10.5, C.dim, 'center', 600);
 
   button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
   button(126, 670, 112, 38, '일시정지', () => { paused = true; }, { size: 15, style: 'ghost', disabled: B.phase === 'over' });
@@ -1360,7 +1380,7 @@ function renderHome() {
   const bw = 340, bh = 52, bx0 = W / 2 - bw / 2, by0 = 196;
   button(bx0, by0, bw, bh, '연습 대전', () => startBattle(), { style: 'primary', size: 20, sub: 'VS 연습 AI' });
   button(bx0, by0 + 62, bw, bh, '온라인 대전', () => enterOnline(), { size: 20, sub: '친구와 1:1 대전' });
-  button(bx0, by0 + 124, bw, bh, '무기 설정', () => showToast('추후 업데이트 예정입니다'), { size: 20, sub: '무기별 공격 범위', lock: true });
+  button(bx0, by0 + 124, bw, bh, '무기 설정', () => enterLoadout(), { size: 20, sub: '기본 무기 + 특수 무기 2칸' });
   button(bx0, by0 + 186, bw, bh, '튜토리얼', () => enterTutorial(), { style: 'gold', size: 20, sub: '처음이라면 여기부터' });
   text(touchMode ? '모바일: 가로 화면 권장 · 오른쪽 버튼으로 이동/점프 · 경기장 탭으로 방향·기술 선택' : 'A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 기술 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
   text('v0.2 · Canvas / Web Audio', W - 14, 16, 11, C.dim, 'right', 500);
@@ -1621,31 +1641,18 @@ const TUT_PAGES = [
     }
   },
   {
-    title: '업데이트 예고 — 무기 설정', tag: 'COMING SOON',
+    title: '무기 설정', tag: 'LOADOUT',
     lines: [
-      '[무기 설정]이 추가되면 무기마다 공격 범위의 모양·길이·높이·대미지가 달라집니다.',
-      '멀리 찌르는 창, 넓고 강한 대검, 멀리서 쏘는 활 등 — 검과는 완전히 다른 거리 싸움이 펼쳐집니다.',
-      '어떤 무기를 고르느냐 자체가 새로운 심리전이 됩니다. 상대의 무기를 보고 "안전 지대"를 계산하세요!'
+      '홈 화면의 [무기 설정]에서 대전에 들고 나갈 무기를 확인하고 바꿀 수 있습니다.',
+      '기본 무기는 검으로 고정입니다. 횡베기·올려베기·내려베기 세 가지 기술을 씁니다.',
+      '특수 무기는 2칸이며 자유롭게 바꿀 수 있습니다. 같은 무기를 두 칸에 동시에 넣을 수는 없습니다.',
+      '특수 무기는 추후 업데이트로 추가됩니다. 지금은 두 칸 모두 비어 있습니다.'
     ],
     draw(x, y, w, h, t) {
-      ['sword', 'spear', 'greatsword', 'bow'].forEach((id, i) => {
-        const wp = WEAPONS[id];
-        const cx = x + 30 + (i % 2) * ((w - 70) / 2 + 10), cy = y + 30 + Math.floor(i / 2) * 210;
-        const cw = (w - 70) / 2, ch = 195;
-        ctx.fillStyle = C.panel2; rr(cx, cy, cw, ch, 12); ctx.fill();
-        ctx.strokeStyle = wp.locked ? C.line : C.gold; ctx.lineWidth = 2; ctx.stroke();
-        ctx.save(); rr(cx + 2, cy + 2, cw - 4, ch - 54, 10); ctx.clip();
-        const sc = 0.55, pos = { x: cx + 40, y: cy + 128 };
-        const b = wp.techs.mid.box;
-        const r = { x0: pos.x + b[0] * sc, x1: pos.x + b[1] * sc, y0: pos.y + b[2] * sc, y1: pos.y + b[3] * sc };
-        drawRectArea(r, wp.locked ? '#8a94a3' : C.p1, { fill: 0.15, lw: 2, alpha: 0.55 + 0.45 * Math.sin(t * 3 + i) ** 2 });
-        drawStick(pos.x, pos.y, { color: C.p1, facing: 1, scale: sc, idle: t, weapon: id });
-        ctx.restore();
-        text(wp.name, cx + 14, cy + ch - 34, 15, C.text, 'left', 800);
-        text(wp.desc, cx + 14, cy + ch - 14, 11, C.sub, 'left', 600);
-        if (wp.locked) drawLock(cx + cw - 22, cy + ch - 30, 0.9);
-        else text('현재 무기', cx + cw - 12, cy + ch - 30, 11, C.gold, 'right', 800);
-      });
+      drawSlotCard(x + 30, y + 30, w - 60, 200, { label: '기본 무기', fixed: true, name: '검', desc: '횡베기 · 올려베기 · 내려베기',
+        drawContent: (cx, cy, cw, ch) => drawSwordCard(cx, cy, cw, ch, t) });
+      const cw = (w - 76) / 2, sel = Math.floor(t / 1.6) % 2;
+      [0, 1].forEach(i => drawSlotCard(x + 30 + i * (cw + 16), y + 250, cw, 190, { label: `특수 무기 ${i + 1}`, empty: true, selected: sel === i }));
     }
   },
   {
@@ -2031,6 +2038,71 @@ function p2pLeave() {
   setTimeout(() => { try { if (conn) conn.close(); } catch (e) {} try { if (peer) peer.destroy(); } catch (e) {} }, 300);
 }
 
+// 무기 칸 카드 (무기 설정 화면 · 튜토리얼 공용)
+function drawSlotCard(x, y, w, h, o) {
+  ctx.save();
+  if (o.selected) { ctx.fillStyle = 'rgba(47,111,209,0.10)'; rr(x - 5, y - 5, w + 10, h + 10, 16); ctx.fill(); }
+  ctx.fillStyle = o.empty ? C.panel2 : C.panel; rr(x, y, w, h, 12); ctx.fill();
+  ctx.strokeStyle = o.selected ? C.p1 : o.fixed ? C.gold : '#b8c1cd'; ctx.lineWidth = o.selected ? 3 : 2;
+  if (o.empty && !o.selected) ctx.setLineDash([7, 6]);
+  ctx.stroke(); ctx.setLineDash([]);
+  text(o.label, x + 16, y + 22, 13, o.fixed ? C.gold : C.sub, 'left', 800);
+  if (o.fixed) { drawLock(x + w - 26, y + 22, 0.8); text('고정', x + w - 42, y + 23, 11, C.gold, 'right', 800); }
+  if (o.empty) {
+    const cx = x + w / 2, cy = y + h / 2 + 4, s = o.s || 1;
+    ctx.strokeStyle = '#a7b1bf'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - 14 * s, cy - 10); ctx.lineTo(cx + 14 * s, cy - 10); ctx.moveTo(cx, cy - 24 * s); ctx.lineTo(cx, cy + 4 * s); ctx.stroke();
+    text('비어 있음', cx, cy + 30 * s, 14 * s, C.dim, 'center', 800);
+  } else if (o.drawContent) o.drawContent(x, y, w, h);
+  if (o.name) text(o.name, x + 16, y + h - 34, 17, C.text, 'left', 900);
+  if (o.desc) text(o.desc, x + 16, y + h - 14, 11, C.sub, 'left', 600);
+  ctx.restore();
+}
+function drawSwordCard(x, y, w, h, t, sc = 0.75) {
+  const pos = { x: x + 52, y: y + h - 64 };
+  const b = WEAPONS.sword.techs.mid.box;
+  drawRectArea({ x0: pos.x + b[0] * sc, x1: pos.x + b[1] * sc, y0: pos.y + b[2] * sc, y1: pos.y + b[3] * sc }, C.p1, { fill: 0.12, lw: 2, alpha: 0.7 });
+  drawStick(pos.x, pos.y, { color: C.p1, facing: 1, scale: sc, idle: t });
+}
+function renderLoadout() {
+  drawBg();
+  text('무기 설정', 40, 50, 30, C.text, 'left', 900);
+  text('기본 무기 1개와 특수 무기 2칸으로 대전에 나갑니다', 40, 86, 15, C.sub, 'left', 600);
+  button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
+  // 왼쪽: 장착 칸 3개
+  const px = 40, pw = 560;
+  panel(px, 120, pw, 520, '장착 중');
+  const sw = WEAPONS.sword;
+  drawSlotCard(px + 20, 150, pw - 40, 200, { label: '기본 무기', fixed: true, name: sw.name, desc: '횡베기 · 올려베기 · 내려베기 · 대미지 25',
+    drawContent: (x, y, w, h) => drawSwordCard(x, y, w, h, gt) });
+  const cw = (pw - 56) / 2;
+  [0, 1].forEach(i => {
+    const id = loadout.special[i], x = px + 20 + i * (cw + 16), y = 372;
+    drawSlotCard(x, y, cw, 200, { label: `특수 무기 ${i + 1}`, selected: loSlot === i, empty: !id,
+      name: id ? SPECIALS[id].name : null, desc: id ? SPECIALS[id].desc : null });
+    buttons.push({ x, y, w: cw, h: 200, onClick: () => { loSlot = i; } });
+    if (inRect(mouse, x, y, cw, 200)) hoverAny = true;
+  });
+  text('칸을 눌러 바꿀 특수 무기 칸을 고르세요 (키보드 1 / 2)', px + pw / 2, 600, 12, C.dim, 'center', 600);
+  // 오른쪽: 선택한 칸에 넣을 특수 무기 목록
+  const lx = 640, lw = 600;
+  panel(lx, 120, lw, 520, `특수 무기 ${loSlot + 1} 칸에 장착할 무기`);
+  const list = Object.values(SPECIALS);
+  if (!list.length) {
+    const cx = lx + lw / 2;
+    drawSlotCard(cx - 110, 190, 220, 170, { label: '', empty: true });
+    text('아직 사용할 수 있는 특수 무기가 없습니다', cx, 400, 18, C.text, 'center', 800);
+    text('특수 무기는 추후 업데이트로 추가됩니다', cx, 430, 14, C.sub, 'center', 600);
+    text('추가되면 이 목록에서 골라 두 칸에 장착할 수 있습니다', cx, 454, 14, C.sub, 'center', 600);
+  } else {
+    list.slice(0, 6).forEach((sp, i) => {
+      const y = 158 + i * 66, on = loadout.special[loSlot] === sp.id;
+      button(lx + 16, y, lw - 32, 56, sp.name, () => setSpecial(loSlot, on ? null : sp.id), { size: 17, sub: sp.desc || '', active: on });
+    });
+  }
+  button(lx + lw / 2 - 110, 570, 220, 46, '이 칸 비우기', () => setSpecial(loSlot, null), { size: 15, disabled: !loadout.special[loSlot] });
+}
+
 function renderOnline() {
   drawBg();
   text('온라인 대전', 40, 50, 30, C.text, 'left', 900);
@@ -2273,6 +2345,7 @@ function render() {
   else if (scene === 'battle') renderBattle();
   else if (scene === 'tutorial') renderTutorial();
   else if (scene === 'online') renderOnline();
+  else if (scene === 'loadout') renderLoadout();
   if (paused) { buttons = []; hoverAny = false; holdZones = []; releaseAllHolds(); renderPause(); }
   if (touchMode && innerHeight > innerWidth && !portraitDismissed) renderRotateHint();
   if (toast) {
