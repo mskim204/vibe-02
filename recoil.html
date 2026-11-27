@@ -6230,8 +6230,8 @@ const OnlineScene = {
 
 // =====================================================================
 // 18. 모바일 터치 조작
-//   · 왼쪽: 이동 스틱 (좌우 이동, 두 번 튕기면 달리기, 위 = 점프, 아래 = 숙이기·발판 내려가기)
-//   · 오른쪽: 공격 / 가드 / 대시 / 점프 / Q·E·R  — 공격·가드·스킬은 항상 바라보는 방향으로 (스틱 좌우로 방향 전환)
+//   · 왼쪽: 이동 스틱 (좌우 이동·방향 전환, 두 번 튕기면 달리기, 아래 = 숙이기·발판 내려가기)
+//   · 오른쪽: 공격 / 가드 / 대시 / 점프 / Q·E·R  — 공격·가드·스킬은 이동 스틱을 민 방향(위·대각선 포함)으로, 스틱을 놓으면 바라보는 정면으로
 // =====================================================================
 const Touch = {
   enabled: false, list: new Map(), pressed: new Set(), released: new Set(), prev: {}, lastAim: null,
@@ -6285,8 +6285,9 @@ const Touch = {
     const dx = stick ? clamp((stick.x - stick.ox) / 16, -1, 1) : 0, dy = stick ? clamp((stick.y - stick.oy) / 16, -1, 1) : 0;
     o.l = dx < -0.35; o.r = dx > 0.35;
     o.lP = o.l && !pv.l ? 1 : 0; o.rP = o.r && !pv.r ? 1 : 0;          // 스틱을 두 번 튕기면 더블탭 → 달리기
-    const stickUp = dy < -0.6, stickDown = dy > 0.6;
-    o.jumpH = stickUp || this.held('jump'); o.jumpP = (stickUp && !pv.stickUp) || this.pressed.has('jump');
+    // 스틱 위쪽은 조준 전용 (점프는 JMP 버튼) · 거의 똑바로 아래로 밀 때만 숙이기
+    const stickUp = false, stickDown = dy > 0.75 && Math.abs(dx) < 0.45;
+    o.jumpH = this.held('jump'); o.jumpP = this.pressed.has('jump');
     o.crouch = stickDown; o.downH = stickDown; o.downP = stickDown && !pv.stickDown;
     o.dashP = this.pressed.has('dash');
     o.atkP = this.pressed.has('atk');
@@ -6294,10 +6295,16 @@ const Touch = {
     o.s1 = this.pressed.has('s1'); o.s2 = this.pressed.has('s2'); o.s3 = this.pressed.has('s3');
     this.prev = { l: o.l, r: o.r, stickUp, stickDown };
     this.pressed.clear(); this.released.clear();
-    // 조준: 모바일에서는 항상 캐릭터가 바라보는 정면으로만 (스틱으로 좌우를 바꾸는 순간에는 바뀔 방향 기준)
+    // 조준: 이동 스틱을 민 방향 그대로 (위·대각선·아래 자유롭게) / 스틱을 놓으면 바라보는 정면
     const W = World, me = W && W.me;
     let aim = null;
-    if (me) { const c = me.chest(), dir = o.l && !o.r ? -1 : o.r && !o.l ? 1 : me.facing; aim = V(c.x + dir * 40, c.y); }
+    if (me) {
+      const c = me.chest();
+      if (stick && Math.hypot(dx, dy) > 0.3) {
+        const L = Math.hypot(dx, dy), ax = Math.abs(dx) < 0.12 ? 0 : dx;   // 똑바로 위/아래면 바라보는 쪽 기준 수직
+        aim = V(c.x + ax / L * 40, c.y + dy / L * 40);
+      } else aim = V(c.x + me.facing * 40, c.y);
+    }
     if (aim) { o.aimX = aim.x; o.aimY = aim.y; this.lastAim = aim; }
     return o;
   },
