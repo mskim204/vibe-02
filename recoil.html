@@ -3787,6 +3787,177 @@ ORIN_MOVES.aQ.arms = ORIN_MOVES.Q.arms;
 ORIN_MOVES.aE.arms = ORIN_MOVES.E.arms;
 ORIN_MOVES.aR.onLand = ORIN_MOVES.R.onLand;
 
+// ---------------------------------------------------------------------
+// KAI — 맨손 격투가 (평범한 사람, 수수한 갈색 옷) · 스킬 없음, 평타만 13종
+//   클릭할 때마다 상황(서기·숙이기·달리기·공중)과 조준(위·정면·아래), 연속 몇 번째인지에 따라 다른 평타가 나감
+// ---------------------------------------------------------------------
+const KAI_MATS = buildMats({
+  skin:  ['#f8d0a8', '#e8a878', '#c07850', '#5a2e20'],
+  shirt: ['#d8a46a', '#a8723f', '#7a4f28', '#2e1b0c'],
+  pants: ['#94684a', '#6c4a30', '#4c321e', '#1c120a'],
+  hair:  ['#7a5636', '#4a3020', '#2e1c12', '#0e0804'],
+  shoe:  ['#6a5040', '#46342a', '#2e2018', '#0c0806'],
+  smear: ['#ffffff', '#fff0d8', '#e8c090', '#a06a30']
+});
+function drawKai(R, f, J) {
+  const G = { aB: 2, lB: 3, body: 4, belt: 5, lF: 6, head: 7, smear: 9, aF: 10 };
+  const { u, n, hip, neck, head, hu, hn } = J;
+  // 뒷팔 / 뒷다리
+  R.back = 1;
+  R.cap(J.shB, J.elB, 1.05, 0.9, 'shirt', G.aB, true);
+  R.cap(J.elB, J.hB, 0.85, 0.75, 'skin', G.aB, true);
+  R.ell(J.hB, 0.95, 0.9, 0, 'skin', G.aB, true);
+  R.cap(J.hipB, J.knB, 1.5, 1.15, 'pants', G.lB, true);
+  R.cap(J.knB, J.anB, 1.15, 0.85, 'pants', G.lB, true);
+  R.cap(J.anB, vadd(J.anB, V(1.9, 0.25)), 0.8, 0.65, 'shoe', G.lB, true);
+  R.back = 0;
+  // 몸통: 수수한 갈색 셔츠 + 허리끈
+  R.poly([vadd(hip, n, -2.0), vadd(vadd(hip, n, 1.9), u, 0.2), vadd(vadd(neck, n, 2.1), u, -1.5), vadd(vadd(neck, n, 1.0), u, 0.3),
+          vadd(vadd(neck, n, -1.4), u, 0.2), vadd(vadd(neck, n, -2.1), u, -1.4)], 'shirt', G.body, true);
+  R.dline(vadd(vadd(neck, n, 0.8), u, -0.2), vadd(vadd(neck, n, 0.2), u, -2.2), '#7a4f28');     // 옷깃
+  R.poly([vadd(vadd(hip, u, 0.3), n, -2.1), vadd(vadd(hip, u, 0.3), n, 2.0), vadd(vadd(hip, u, 1.3), n, 2.1), vadd(vadd(hip, u, 1.3), n, -2.2)], 'pants', G.belt, false);
+  // 앞다리
+  R.cap(J.hipF, J.knF, 1.55, 1.2, 'pants', G.lF, true);
+  R.cap(J.knF, J.anF, 1.2, 0.88, 'pants', G.lF, true);
+  R.cap(J.anF, vadd(J.anF, V(1.9, 0.25)), 0.82, 0.66, 'shoe', G.lF, true);
+  // 머리: 짧은 갈색 머리, 눈
+  R.ell(head, 2.9, 3.3, J.ht, 'skin', G.head, true);
+  R.ell(vadd(vadd(head, hu, 1.4), hn, -0.6), 3.0, 2.1, J.ht, 'hair', G.head, false);
+  R.cap(vadd(vadd(head, hu, 0.4), hn, -2.4), vadd(vadd(head, hu, 1.6), hn, -2.6), 0.8, 0.6, 'hair', G.head, false);
+  R.dot(vadd(vadd(head, hu, 0.2), hn, 1.9), '#14141e');
+  R.dline(vadd(vadd(head, hu, 0.9), hn, 1.3), vadd(vadd(head, hu, 0.9), hn, 2.4), '#4a3020');       // 눈썹
+  drawSmear(R, J, G.smear);
+  // 앞팔 (주먹)
+  R.cap(J.shF, J.elF, 1.1, 0.92, 'shirt', G.aF, true);
+  R.cap(J.elF, J.hF, 0.88, 0.78, 'skin', G.aF, true);
+  R.ell(J.hF, 1.0, 0.95, 0, 'skin', G.aF, true);
+}
+// 권투 자세: 두 주먹을 턱 앞에
+function kaiIdleArms(f, J, a) {
+  const S = J.shF, B = J.shB, br = Math.sin(f.animT * 0.1) * 0.3;
+  if (a === 'run' || a === 'dash') return { hF: vadd(S, V(-2.6, 4.2)), wAng: 0, hB: vadd(B, V(2.8, 3.2)), wAngB: 0 };
+  if (a === 'jump' || a === 'fall') return { hF: vadd(S, V(3.0, 0.5)), wAng: 0, hB: vadd(B, V(-2.2, 3.4)), wAngB: 0 };
+  return { hF: vadd(S, V(4.2, 1.4 + br)), wAng: 0, hB: vadd(B, V(3.6, 0.4 + br)), wAngB: 0 };
+}
+function kaiGuardArms(f, J, ga) {
+  const S = J.shF, gd = dirOf(ga), pv = V(-gd.y, gd.x);
+  return { hF: vadd(vadd(S, gd, 5.4), pv, -1.2), wAng: ga, hB: vadd(vadd(S, gd, 4.8), pv, 1.4), wAngB: ga };
+}
+function kaiOffhand(f, J, o) { if (o.attacking && !o.keepB) { o.hB = vadd(J.shB, V(3.4, 0.6)); o.wAngB = 0; } }
+
+// 발차기: 다리를 조준 방향으로 뻗음 (몸 자세) + 다리를 따라 판정
+function kickBody(opt = {}) {
+  return function (f, P, k, ph, L) {
+    const m = f.move, a = f.moveAim, len = L * (opt.len || 0.98);
+    if (opt.low) { P.hipY = -f.def.dim.hipH * 0.55; P.lean = 0.5; P.tilt = -0.3; }
+    else P.lean = (opt.lean !== undefined ? opt.lean : -0.35) - Math.max(0, -a) * 0.3;
+    const hip = V(P.hipX, P.hipY);
+    P.air = true; P.fB = f.onGround ? V(-3.6, 0) : V(P.hipX - 2, P.hipY + L * 0.8);
+    if (ph === 's') { const p = (k + 1) / m.startup; P.fF = vadd(hip, V(2.5 + p * 1.5, L * (0.85 - p * 0.55))); }
+    else {
+      const ext = ph === 'a' ? 1 : Math.max(0, 1 - (k - m.startup - m.active) / Math.max(1, m.recovery + f.recExtra));
+      const tip = vadd(hip, dirOf(a), len);
+      P.fF = vlerp(vadd(hip, V(2.5, L * 0.6)), tip, ext);
+      if (ph === 'r' && ext < 0.35 && f.onGround) { P.air = false; P.fF = V(2.8, 0); }
+    }
+  };
+}
+function legBoxes(f, J, k) {
+  if (f.phaseOf(k) !== 'a') return [];
+  const out = [], A = J.hipF, B = J.anF, dv = V(B.x - A.x, B.y - A.y), Ln = Math.hypot(dv.x, dv.y) || 1;
+  for (let t = 0.45; t <= 1.0001; t += 0.18) { const c = vadd(A, dv, t); out.push({ x: c.x - 2, y: c.y - 2, w: 4, h: 4 }); }
+  const tip = vadd(B, V(dv.x / Ln, dv.y / Ln), 1.6); out.push({ x: tip.x - 2, y: tip.y - 2, w: 4, h: 4 });
+  return out;
+}
+// 무릎: 무릎을 앞으로 끌어올림 + 무릎 주변 판정
+function kneeBody(f, P, k, ph, L) {
+  const hip = V(P.hipX, P.hipY), m = f.move;
+  P.lean = 0.25; P.air = true;
+  P.fB = f.onGround ? V(-3.8, 0) : V(P.hipX - 2, P.hipY + L * 0.82);
+  const up = ph === 's' ? (k + 1) / m.startup : ph === 'a' ? 1 : 0.5;
+  P.fF = vadd(hip, V(2.2 + up * 2.2, L * (0.95 - up * 0.45)));
+}
+function kneeBoxes(f, J, k) {
+  if (f.phaseOf(k) !== 'a') return [];
+  const c = J.knF; return [{ x: c.x - 3, y: c.y - 3, w: 6.5, h: 6 }, { x: (c.x + J.hipF.x) / 2 - 2, y: (c.y + J.hipF.y) / 2 - 2, w: 4, h: 4 }];
+}
+const kickArms = (f, J) => ({ hF: vadd(J.shF, V(2.6, 2.2)), wAng: 0, hB: vadd(J.shB, V(-2.4, 2.6)), wAngB: 0, attacking: true });
+
+// 다음 평타 고르기: 조준 위 → 올려치기 / 아래 → 낮은 발차기·쓸기 / 정면 → 잽→스트레이트→훅→돌려차기 순서
+//   한 연속 공격에서 같은 기술은 한 번만 → 클릭할 때마다 다른 평타
+function kaiNext(f) {
+  const used = f.kaiUsed || [], air = !f.onGround, a = f.aim;
+  if (used.length >= (air ? 4 : 5)) return null;
+  let want = null;
+  if (air) want = a < -0.55 ? 'aUP' : a > 0.6 ? 'aN3' : null;
+  else want = a < -0.55 ? 'UP' : a > 0.45 ? (used.includes('LK') ? 'SW' : 'LK') : null;
+  if (want && !used.includes(want)) return want;
+  const order = air ? ['aN1', 'aN2', 'aN3'] : ['N1', 'N2', 'N3', 'N4'];
+  const last = used[used.length - 1], at = order.indexOf(last);
+  for (let i = 1; i <= order.length; i++) { const id = order[(Math.max(0, at) + i) % order.length]; if (!used.includes(id)) return id; }
+  return null;
+}
+// 첫 타: 숙이면 낮은 발차기, 달리거나 대시 중이면 무릎 돌진, 위로 노리면 올려치기, 아래면 낮은 발차기, 공중은 높이에 따라
+function kaiStart(f, inp) {
+  const a = f.aim;
+  if (!f.onGround) return a < -0.55 ? 'aUP' : a > 0.75 ? 'aST' : 'aN1';
+  if (inp.crouch) return 'LK';
+  if (f.state === 'run' || f.state === 'dash' || f.running) return 'DK';
+  if (a < -0.55) return 'UP';
+  if (a > 0.45) return 'LK';
+  return 'N1';
+}
+const KAI_MOVES = {
+  N1: { name: 'JAB', normal: true, startup: 3, active: 2, recovery: 8, chain: kaiNext, whiffRecoil: 1.2, whiffExtra: 6, lean: 0.3,
+    shape: { type: 'thrust', r0: 4, r1: 12, size: 3.5 },
+    hit: { dmg: 20, hitstun: 15, blockstun: 9, kb: 1.0, hitstop: 4, guardDmg: 8, blockPush: 1.4 }, onFrame: stepForward(0.7) },
+  N2: { name: 'STRAIGHT', normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 7, lean: 0.45,
+    shape: { type: 'thrust', r0: 4, r1: 13.5, size: 3.5 },
+    hit: { dmg: 26, hitstun: 16, blockstun: 10, kb: 1.3, hitstop: 5, guardDmg: 10, blockPush: 1.6 }, onFrame: stepForward(1.0) },
+  N3: { name: 'HOOK', normal: true, startup: 5, active: 3, recovery: 11, chain: kaiNext, whiffRecoil: 1.6, whiffExtra: 8, lean: 0.3,
+    shape: { type: 'arc', from: -1.1, to: 0.6, r0: 3, r1: 12, size: 3.5 },
+    hit: { dmg: 30, hitstun: 18, blockstun: 11, kb: 1.2, kbY: -0.8, hitstop: 5, guardDmg: 12, blockPush: 1.8 }, onFrame: stepForward(0.8) },
+  N4: { name: 'ROUNDHOUSE', normal: true, startup: 7, active: 4, recovery: 15, chain: kaiNext, whiffRecoil: 2.0, whiffExtra: 10, aimClamp: [-0.7, 0.3],
+    body: kickBody({ lean: -0.4 }), boxesAt: legBoxes, arms: kickArms,
+    hit: { dmg: 40, hitstun: 26, blockstun: 13, kb: 3.0, kbY: -1.4, knockdown: true, hitstop: 8, shake: 2, guardDmg: 18, blockPush: 2.6 }, onFrame: stepForward(0.5) },
+  UP: { name: 'UPPERCUT', normal: true, startup: 5, active: 3, recovery: 13, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 9, aimClamp: [-1.0, -0.45], lean: 0.1,
+    shape: { type: 'arc', from: 0.95, to: -0.45, r0: 3, r1: 13, size: 4 },     // 앞 아래에서 위로 쳐 올림
+    hit: { dmg: 34, hitstun: 26, blockstun: 12, kb: 0.6, kbY: -4.8, hitstop: 7, shake: 1, guardDmg: 14, blockPush: 1.6 },   // 띄우기 → 점프 캔슬로 공중 콤보
+    onFrame: stepForward(0.9) },
+  LK: { name: 'LOW KICK', normal: true, startup: 4, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.2, whiffExtra: 7, aimClamp: [0.35, 0.8],
+    body: kickBody({ low: true, len: 0.92 }), boxesAt: legBoxes, arms: kickArms,
+    hit: { dmg: 22, hitstun: 16, blockstun: 10, kb: 1.0, hitstop: 4, guardDmg: 9, blockPush: 1.4 } },
+  SW: { name: 'SWEEP', normal: true, startup: 6, active: 4, recovery: 16, whiffRecoil: 1.6, whiffExtra: 10, aimClamp: [0.4, 0.6],
+    body: kickBody({ low: true, len: 1.08 }), boxesAt: legBoxes, arms: kickArms,
+    hit: { dmg: 34, hitstun: 30, blockstun: 12, kb: 1.4, kbY: -2.0, knockdown: true, hitstop: 7, shake: 1, guardDmg: 14, blockPush: 2 } },
+  DK: { name: 'DASH KNEE', normal: true, startup: 4, active: 5, recovery: 13, chain: kaiNext, whiffRecoil: 2.2, whiffExtra: 10,
+    body: kneeBody, boxesAt: kneeBoxes, arms: kickArms,
+    hit: { dmg: 32, hitstun: 20, blockstun: 12, kb: 2.2, kbY: -1.6, hitstop: 6, shake: 1, guardDmg: 14, blockPush: 2.2 },
+    onFrame(f, k) {   // 달려오던 힘으로 무릎을 밀어 넣음
+      const m = f.move;
+      if (k < m.startup + m.active && !f.moveHit && !f.moveBlocked) { f.vx = f.facing * 3.0; if (k % 2 === 0) FX.ghost(f); return true; }
+      return false;
+    } },
+  // ---- 공중 ----
+  aN1: { name: 'AIR JAB', normal: true, air: true, landCancel: true, chain: kaiNext, startup: 3, active: 3, recovery: 9, whiffRecoil: 0.4, whiffExtra: 5,
+    shape: { type: 'thrust', r0: 4, r1: 12.5, size: 3.5 },
+    hit: { dmg: 22, hitstun: 22, blockstun: 10, kb: 0.8, kbY: -1.8, hitstop: 4, guardDmg: 9, blockPush: 1.3 } },
+  aN2: { name: 'AIR KNEE', normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 4, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+    body: kneeBody, boxesAt: kneeBoxes, arms: kickArms,
+    hit: { dmg: 28, hitstun: 22, blockstun: 11, kb: 0.9, kbY: -2.4, hitstop: 5, guardDmg: 11, blockPush: 1.4 } },
+  aN3: { name: 'AXE KICK', normal: true, air: true, landCancel: true, startup: 6, active: 4, recovery: 13, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.35, 1.3],
+    body: kickBody({ lean: -0.2 }), boxesAt: legBoxes, arms: kickArms,
+    hit: { dmg: 38, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 8, shake: 2, guardDmg: 16, blockPush: 2 } },
+  aUP: { name: 'AIR UPPER', normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+    aimClamp: [-1.0, -0.45], shape: { type: 'arc', from: 0.95, to: -0.45, r0: 3, r1: 13, size: 4 },
+    hit: { dmg: 26, hitstun: 24, blockstun: 11, kb: 0.6, kbY: -3.6, hitstop: 5, guardDmg: 11, blockPush: 1.2 } },
+  aST: { name: 'STOMP', normal: true, air: true, landCancel: true, startup: 5, active: 5, recovery: 14, whiffRecoil: 0.3, whiffExtra: 8, aimClamp: [1.05, 1.45],
+    body: kickBody({ lean: 0.1, len: 0.95 }), boxesAt: legBoxes, arms: kickArms,
+    hit: { dmg: 36, hitstun: 26, blockstun: 13, kb: 1.0, spike: true, hitstop: 8, shake: 2, guardDmg: 16, blockPush: 1.6 },
+    onFrame(f, k) { if (k >= f.move.startup && !f.moveHit) { f.vy = Math.max(f.vy, 2.4); } return false; } }
+};
+
+
 const CHARS = {
   RAZE: {
     id: 'RAZE', name: 'RAZE', title: 'SHADOW DAGGER', style: 'RUSHDOWN', hp: 950,
@@ -3807,9 +3978,18 @@ const CHARS = {
     // 철벽: 넓은 가드 각도 + 창을 세운 가드 영역이 몸보다 먼저 막음
     guard: { name: 'IRON WALL', just: 9, gauge: 130, bsMul: 0.8, push: 0.7, jgStagger: 16, arc: 1.25, zone: true },
     moves: ORIN_MOVES, draw: drawOrin, idleArms: orinIdleArms, guardArms: orinGuardArms, offhand: orinOffhand
+  },
+  KAI: {
+    id: 'KAI', name: 'KAI', title: 'BARE FIST', style: 'BRAWLER', hp: 1000, noSkills: true, pitch: 1.0,
+    walk: 1.4, run: 2.7, jumpV: -5.6, grav: 0.32, airAcc: 0.25, dashMul: 1.0,
+    dim: { hipH: 11.5, thigh: 6.0, shin: 6.0, torso: 8.4, headR: 3.2, upper: 4.9, fore: 4.7, crouchH: 15.5, crouchTop: 16.8 },
+    mats: KAI_MATS, fx: { col: PAL.orange },
+    // 맨손 가드: 보통 각도, 스킬이 없는 대신 가드 게이지가 조금 넉넉함
+    guard: { name: 'BARE GUARD', just: 9, gauge: 105, bsMul: 0.85, push: 1.0, jgStagger: 20, arc: 1.05, zone: false },
+    moves: KAI_MOVES, pickNormal: kaiStart, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
   }
 };
-const CHAR_LIST = ['RAZE', 'ORIN'];
+const CHAR_LIST = ['RAZE', 'ORIN', 'KAI'];
 
 // =====================================================================
 // 8. 파이터 (이동 + 전투 상태 머신 + 뼈대 리그/부위별 판정 + 마우스 조준)
@@ -3969,7 +4149,8 @@ class Fighter {
     if (this.jumpBuf > 0) this.jumpBuf--;
     if (this.dashBuf > 0) this.dashBuf--;
     if (this.bufT > 0 && --this.bufT === 0) this.buf = null;
-    for (const k in this.cd) if (this.cd[k] > 0) this.cd[k]--;
+    if (this.def.noSkills) this.cd.s1 = this.cd.s2 = this.cd.s3 = 99999;   // 스킬 없음
+    else for (const k in this.cd) if (this.cd[k] > 0) this.cd[k]--;
     if (this.frame - this.guardPressF > 40) this.spam = 0;
     if (!this.isGuarding() && this.state !== 'gbreak') {
       if (this.gaugeDelay > 0) this.gaugeDelay--;
@@ -4095,10 +4276,11 @@ class Fighter {
   tryBuffered(inp) {
     const b = this.buf; let id;
     if (b === 'atk') {
-      if (!this.onGround) { if (this.airAtk >= 2) return false; id = 'aN1'; }
-      else id = 'N1';
+      if (!this.onGround && this.airAtk >= 2) return false;
+      id = this.def.pickNormal ? this.def.pickNormal(this, inp) : this.onGround ? 'N1' : 'aN1';   // 상황마다 다른 첫 평타 (KAI)
     } else {
       id = skillId(this, b);
+      if (!this.def.moves[id]) { this.buf = null; return false; }     // 스킬이 없는 캐릭터
       if (this.cd[b] > 0) return false;
     }
     this.buf = null; this.bufT = 0;
@@ -4116,9 +4298,14 @@ class Fighter {
     this.linkOpen = 1e9; this.linkMiss = false; this.linkBonus = false;
     this.moveAim = this.clampAim(m, this.aim);
     this.state = 'attack'; this.animT = 0; this.running = false;
-    const pitch = this.def.id === 'ORIN' ? 0.6 : 1.25;
+    const pitch = this.def.pitch || (this.def.id === 'ORIN' ? 0.6 : 1.25);
+    if (this.def.pickNormal) {                         // 한 연속 공격에서 쓴 평타 기록 → 다음 타는 다른 기술
+      if (!this.chainNext) { this.kaiUsed = []; if (m.air) this.airAtk++; }
+      this.kaiUsed.push(id);
+    }
+    this.chainNext = false;
     if (m.skill) { this.cd[m.skill] = m.cd; SFX.play('skill', pitch); } else SFX.play('swing', pitch * (0.92 + Math.random() * 0.16));
-    if (id === 'aN1') this.airAtk++;
+    if (id === 'aN1' && !this.def.pickNormal) this.airAtk++;
     if (m.onStart) m.onStart(this);
     emit('move', { f: this, id });
   }
@@ -4142,10 +4329,11 @@ class Fighter {
           this.linkMiss = true; this.buf = null;
           Popups.add('DROP', this.x, this.topY - 6, PAL.gray); emit('linkDrop', { f: this });
         } else perfect = this.bufPressHT <= this.linkOpen + 3;
-        if (this.buf === 'atk' && m.chain) { this.buf = null; this.startMove(m.chain); this.linkBonus = perfect; return; }
+        const next = this.buf === 'atk' && m.chain ? (typeof m.chain === 'function' ? m.chain(this) : m.chain) : null;
+        if (next) { this.buf = null; this.chainNext = true; this.startMove(next); this.linkBonus = perfect; return; }
         if (this.buf && this.buf !== 'atk') {
           const slot = this.buf;
-          if (this.cd[slot] === 0 && (m.normal || (this.moveHit && m.skill !== slot))) {
+          if (this.def.moves[skillId(this, slot)] && this.cd[slot] === 0 && (m.normal || (this.moveHit && m.skill !== slot))) {
             this.buf = null; this.startMove(skillId(this, slot)); this.linkBonus = perfect; return;
           }
         }
@@ -4722,7 +4910,8 @@ const SKILL_ICONS_AIR = {
 };
 const CHAR_INFO = {
   RAZE: { ko: '근접 연타형', desc: '쌍단검과 돌진으로 몰아붙이는 그림자 결투가', stats: [['SPD', 5], ['RNG', 2], ['POW', 3], ['DEF', 2]] },
-  ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] }
+  ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] },
+  KAI: { ko: '맨손 평타형', desc: '스킬 없이 평타만! 상황·조준·순서마다 다른 평타 13종', stats: [['SPD', 4], ['RNG', 1], ['POW', 3], ['DEF', 3]] }
 };
 
 // =====================================================================
@@ -5215,7 +5404,7 @@ const LESSONS = [
     frame(b) { return b.debug ? 1 : 0; } },
   { title: '평타와 체인', lines: ['평타가 콤보의 중심입니다. 맞으면 화면이 잠깐 멈칫합니다.', '멈칫이 풀리는 순간에 다시 클릭해야 다음 타로 이어집니다. 너무 일찍 누르면 DROP!', '완벽한 타이밍이면 LINK! — 대미지가 20% 늘고 스킬 쿨타임도 더 줄어듭니다.'],
     goal: '평타 체인을 끝까지 맞히기', need: 3, dummy: 'STAND',
-    init(b) { this.need = b.p1.def.id === 'RAZE' ? 3 : 2; },
+    init(b) { this.need = b.p1.def.id === 'ORIN' ? 2 : 3; },
     frame(b) { return Math.max(0, b.comboView[0].hits - b.tutProg); } },
   { title: '조준 공격', lines: ['모든 공격과 스킬은 마우스 커서 방향으로 나갑니다. 커서가 등 뒤면 그쪽으로 돌아서서 공격!', '위로 노려 맞히면 상대가 뜨고, 공중의 상대를 아래로 노리면 내리꽂힙니다.', '공격 발동 직전까지 조준을 바꿀 수 있습니다 (점이 노란색이 되면 고정).'],
     goal: '위쪽 조준과 아래쪽 조준으로 각각 맞히기', need: 2, dummy: 'STAND',
@@ -5227,8 +5416,15 @@ const LESSONS = [
     } },
   { title: '스킬', lines: ['Q, E, R 스킬은 쿨타임이 길고, 콤보를 잇는 연결용입니다 (커서 방향).', '평타를 맞힐 때마다 스킬 쿨타임이 줄어듭니다. 평타로 시간을 버세요!', '평타가 맞은 직후 타이밍에 맞춰 스킬을 누르면 캔슬되어 콤보가 이어집니다.'],
     goal: 'Q, E, R 스킬을 모두 사용하기', need: 3, dummy: 'STAND',
-    init() { this.used = new Set(); },
-    event(b, type, d) { const sk = d.f && d.f.move && d.f.move.skill; if (type === 'move' && d.f === b.p1 && sk && !this.used.has(sk)) { this.used.add(sk); return 1; } } },
+    init(b) {
+      this.used = new Set(); this.noSk = b.p1.def.noSkills;
+      this.goal = this.noSk ? '스킬 없는 캐릭터: 서로 다른 평타 4종류 쓰기' : 'Q, E, R 스킬을 모두 사용하기'; this.need = this.noSk ? 4 : 3;
+    },
+    event(b, type, d) {
+      if (type !== 'move' || d.f !== b.p1) return;
+      const key = this.noSk ? d.id : d.f.move && d.f.move.skill;
+      if (key && !this.used.has(key)) { this.used.add(key); return 1; }
+    } },
   { title: '공중 콤보', lines: ['공중에서는 평타와 Q·E·R이 공중 전용 기술로 바뀝니다 (아이콘이 노랗게).', '공격이 맞는 순간 Space를 누르면 점프 캔슬! 공중에선 2단 점프로 이어집니다.', '공중 평타 3타째는 내려찍기 → 상대가 바닥에 튕겨 다시 뜹니다.', '같은 기술을 반복하면 대미지가 크게 줄고, 다양하게 섞을수록 강합니다.'],
     goal: '지상 공격을 맞히고 공중 기술로 이어 3히트 콤보', need: 1, dummy: 'STAND',
     event(b, type, d) { if (type === 'hit' && d.atk === b.p1 && d.atk.moveId && d.atk.moveId[0] === 'a' && d.def.combo >= 3 && d.def.comboIds.some(id => id[0] !== 'a')) return 1; } },
@@ -5802,6 +5998,17 @@ class Battle {
   drawSkills(f, side) {
     const slots = ['s1', 's2', 's3'], keys = ['Q', 'E', 'R'], y = VH - 20;
     const x0 = side ? VW - 4 - 3 * 18 + 1 : 4;
+    if (f.def.noSkills) {                              // 스킬 없는 캐릭터: 이번 연속 공격에서 쓴 평타 표시
+      R(x0 - 0.5, y - 0.5, 53, 17, PAL.ink); R(x0, y, 52, 16, '#1a1a28'); rectLine(x0, y, 52, 16, SIDE_COL[side]);
+      drawText('FISTS', x0 + 26, y + 2, PAL.yellow, { align: 'center' });
+      const used = f.state === 'attack' && f.kaiUsed ? f.kaiUsed.length : 0;
+      for (let i = 0; i < 5; i++) R(x0 + 6 + i * 8.5, y + 10, 6, 3, i < used ? PAL.orange : PAL.dgray);
+      const dx = side ? x0 - 8 : x0 + 3 * 18 + 2;
+      R(dx - 0.5, y - 0.5, 5, 17, PAL.ink);
+      const ready = f.canDash(), fill = f.dashT > 0 ? 0 : Math.round(16 * (1 - f.dashCD / DASH_CD));
+      R(dx, y + 16 - fill, 4, fill, ready ? PAL.cyan : PAL.gray);
+      return;
+    }
     slots.forEach((s, i) => {
       const bx = x0 + i * 18, cd = f.cd[s], m = f.def.moves[skillId(f, s)], airI = !f.onGround;
       if (this.cdPrev[side][s] > 0 && cd === 0) this.cdFlash[side][s] = 12;
@@ -5964,28 +6171,34 @@ const CharScene = {
     MenuBG.draw();
     kText('캐릭터 선택', VW / 2, 4, PAL.yellow, { align: 'center', size: 13 });
     this.rects = [];
+    // 위: 캐릭터 카드 / 아래: 고른 캐릭터 상세
+    const n = CHAR_LIST.length, cw = Math.floor((VW - 16 - (n - 1) * 4) / n);
     CHAR_LIST.forEach((id, i) => {
-      const d = CHARS[id], info = CHAR_INFO[id], x = 10 + i * 152, y = 20, w = 148, h = 116, sel = i === this.sel;
+      const d = CHARS[id], info = CHAR_INFO[id], x = 8 + i * (cw + 4), y = 18, w = cw, h = 66, sel = i === this.sel;
       this.rects.push({ x, y, w, h });
       panel(x, y, w, h, 0.9, sel ? (this.t % 20 < 14 ? PAL.yellow : PAL.orange) : PAL.indigo);
       if (Game.p1Char === id) drawText('NOW', x + w - 4, y + 4, PAL.green, { align: 'right' });
-      // 미리보기 (2배)
-      drawFighterScaled(this.prev[i], x + 28, y + 108, 2);
-      R(x + 10, y + 109, 36, 2, SIDE_COL[0]);
-      const tx = x + 56;
-      drawText(d.name, tx, y + 6, sel ? PAL.white : PAL.lgray, { scale: 2 });
-      drawText(d.title, tx, y + 19, SIDE_COL[0]);
-      kText(info.ko, tx, y + 27, PAL.yellow);
-      info.stats.forEach(([k, v], j) => {
-        const sy = y + 43 + j * 8;
-        drawText(k, tx, sy, PAL.lgray);
-        for (let b = 0; b < 5; b++) R(tx + 16 + b * 7, sy, 6, 5, b < v ? (sel ? PAL.cyan : PAL.blue) : PAL.dgray);
-      });
-      const mv = d.moves;
-      [['Q', mv.Q.name], ['E', mv.E.name], ['R', mv.R.name], ['G', d.guard.name]].forEach(([k, nm], j) => {
-        const sy = y + 78 + j * 8;
-        drawText(k, tx, sy, PAL.yellow); drawText(nm, tx + 6, sy, PAL.white);
-      });
+      drawFighterScaled(this.prev[i], x + 22, y + 62, 2);
+      R(x + 6, y + 63, 32, 1.5, SIDE_COL[0]);
+      const tx = x + 44;
+      drawText(d.name, tx, y + 8, sel ? PAL.white : PAL.lgray, { scale: 2 });
+      drawText(d.title, tx, y + 22, SIDE_COL[0]);
+      kText(info.ko, tx, y + 31, PAL.yellow, { size: 10 });
+      drawText(d.style, tx, y + 45, PAL.gray);
+    });
+    const id = CHAR_LIST[this.sel], d = CHARS[id], info = CHAR_INFO[id], y = 88;
+    panel(8, y, VW - 16, 50, 0.9, PAL.indigo);
+    info.stats.forEach(([k, v], j) => {
+      const sy = y + 6 + j * 10;
+      drawText(k, 16, sy, PAL.lgray);
+      for (let b = 0; b < 5; b++) R(32 + b * 8, sy, 7, 6, b < v ? PAL.cyan : PAL.dgray);
+    });
+    const mv = d.moves, lines = d.noSkills
+      ? [['N', 'JAB > STRAIGHT > HOOK > ROUNDHOUSE'], ['UP', 'UPPERCUT   LOW: LOW KICK > SWEEP'], ['RUN', 'DASH KNEE   AIR: 5 MOVES'], ['G', d.guard.name + '  (NO SKILLS)']]
+      : [['Q', mv.Q.name], ['E', mv.E.name], ['R', mv.R.name], ['G', d.guard.name]];
+    lines.forEach(([k, nm], j) => {
+      const sy = y + 6 + j * 10;
+      drawText(k, 84, sy, PAL.yellow); drawText(nm, 104, sy, PAL.white);
     });
     kText(CHAR_INFO[CHAR_LIST[this.sel]].desc, VW / 2, 142, PAL.cyan, { align: 'center' });
     kText('A/D 선택   ENTER 결정   ESC 뒤로', VW / 2, VH - 15, PAL.gray, { align: 'center' });
@@ -6436,7 +6649,8 @@ const Touch = {
       { id: 's3', x: 279, y: 83, r: 8, label: 'R', col: PAL.peri },
       { id: 'pause', x: VW - 14, y: 38, r: 7, label: 'II', col: PAL.gray }
     ];
-    const sc = Loop.scene;
+    const sc = Loop.scene, me = sc && sc.isBattle && sc.me;
+    if (me && me.def.noSkills) for (let i = b.length - 1; i >= 0; i--) if (b[i].id[0] === 's' && b[i].id.length === 2) b.splice(i, 1);
     if (sc instanceof Battle && sc.mode === 'tutorial' && sc.tutDone) b.push({ id: 'next', x: VW / 2, y: 120, r: 12, label: 'NEXT', col: PAL.green });
     return b;
   },
