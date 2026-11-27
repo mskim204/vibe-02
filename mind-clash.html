@@ -171,6 +171,10 @@ const Sfx = {
   tick() { this.tone(1000, 0.08, { type: 'square', vol: 0.08 }); },
   ready() { this.tone(520, 0.09, { type: 'triangle', vol: 0.2 }); this.tone(780, 0.14, { type: 'triangle', vol: 0.2, delay: 0.08 }); },
   err() { this.tone(190, 0.16, { type: 'square', vol: 0.1 }); },
+  shot() { this.noise(0.18, { vol: 0.6, freq: 1800, to: 300, type: 'lowpass' }); this.tone(120, 0.15, { type: 'square', vol: 0.2, to: 50 }); },
+  load() { this.tone(900, 0.05, { type: 'square', vol: 0.08 }); this.tone(600, 0.06, { type: 'square', vol: 0.08, delay: 0.08 }); },
+  heal() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.25, { type: 'sine', vol: 0.15, delay: i * 0.07 })); },
+  guard() { this.tone(1600, 0.25, { type: 'triangle', vol: 0.15, to: 900 }); this.noise(0.1, { vol: 0.2, freq: 3000, type: 'highpass' }); },
   phase() { this.tone(330, 0.12, { type: 'triangle', vol: 0.12 }); this.tone(495, 0.16, { type: 'triangle', vol: 0.12, delay: 0.07 }); },
   win() { [523, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.3, { type: 'triangle', vol: 0.22, delay: i * 0.12 })); },
   lose() { [440, 370, 311, 220].forEach((f, i) => this.tone(f, 0.35, { type: 'sawtooth', vol: 0.08, delay: i * 0.16 })); },
@@ -196,22 +200,31 @@ const WEAPONS = {
 const TECH_ORDER = ['mid', 'up', 'down'];
 
 // ----------------------------------------------------------------- 무기 설정 (로드아웃)
-/* 기본 무기 1개(검, 고정) + 특수 무기 2칸(교체 가능).
-   SPECIALS 에 특수 무기를 정의하면 무기 설정 화면의 목록에 자동으로 나타난다. (현재는 비어 있음)
-   예) SPECIALS.example = { id: 'example', name: '이름', desc: '설명' };                     */
-const SPECIALS = {};
-const LOADOUT_KEY = 'mindclash.loadout.v1';
-const loadout = { base: 'sword', special: [null, null] };
+/* 기본 무기 1개(검, 고정) + 특수 스킬 2칸. 각 특수 스킬은 정해진 칸(slot 0 = 1번 칸, 1 = 2번 칸)에만 장착된다.
+   규칙: 특수 스킬을 쓰는 턴에는 검 공격을 할 수 없고, 다 쓴 특수 스킬은 SP_COOLDOWN 턴 동안 다시 쓸 수 없다. */
+const SP_COOLDOWN = 2, HEAL_TURNS = 3, HEAL_AMOUNT = 50, GUN_MAX = 3;
+const SPECIALS = {
+  heal:  { id: 'heal',  slot: 0, name: '회복',      color: '#2f9e5b', desc: `${HEAL_TURNS}턴 연속 모으면 체력 +${HEAL_AMOUNT}`,
+           detail: '모으는 중에 맞거나 다른 행동을 하면 처음부터' },
+  guard: { id: 'guard', slot: 0, name: '철벽 방어', color: '#b07a0e', desc: '이번 턴 바라보는 쪽 공격을 막음',
+           detail: '등 뒤에서 오는 공격은 막지 못함' },
+  gun:   { id: 'gun',   slot: 1, name: '랜덤 건',   color: '#7a4fd1', desc: `장전(최대 ${GUN_MAX}발) 후 발사 · 같은 층 멀리`,
+           detail: '대미지 25부터 무작위, 탄이 많을수록 최대치 증가 · 장전 중 맞으면 탄 초기화', box: [0, 390, -95, -20] },
+  whirl: { id: 'whirl', slot: 1, name: '회전 베기', color: '#c2551f', desc: '같은 층 양옆을 동시에 벰 · 대미지 20',
+           detail: '상대가 어느 쪽에 있을지 모를 때', box: [-140, 140, -118, -2], damage: 20 }
+};
+const LOADOUT_KEY = 'mindclash.loadout.v2';
+const loadout = { base: 'sword', special: ['heal', 'gun'] };
+const validSpecial = (id, slot) => !!(id && SPECIALS[id] && SPECIALS[id].slot === slot);
 (function loadLoadout() {
   try {
     const d = JSON.parse(localStorage.getItem(LOADOUT_KEY) || 'null');
-    if (d && Array.isArray(d.special)) loadout.special = [0, 1].map(i => (d.special[i] && SPECIALS[d.special[i]]) ? d.special[i] : null);
+    if (d && Array.isArray(d.special)) loadout.special = [0, 1].map(i => validSpecial(d.special[i], i) ? d.special[i] : null);
   } catch (e) {}
 })();
 function saveLoadout() { try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(loadout)); } catch (e) {} }
 function setSpecial(slot, id) {
-  if (id !== null && !SPECIALS[id]) return;
-  if (id !== null && loadout.special[1 - slot] === id) loadout.special[1 - slot] = null;   // 같은 무기 중복 장착 방지
+  if (id !== null && !validSpecial(id, slot)) return;   // 각 특수 스킬은 자기 칸에만
   loadout.special[slot] = id; saveLoadout();
 }
 const specialName = id => (id && SPECIALS[id] ? SPECIALS[id].name : '없음');
@@ -223,7 +236,63 @@ function techRect(pos, facing, weaponId, techId) {
 }
 const bodyRect = pos => ({ x0: pos.x - BODY_W / 2, x1: pos.x + BODY_W / 2, y0: pos.y - BODY_H, y1: pos.y });
 const overlap = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
-const attackHits = (att, target) => overlap(techRect(att.pos, att.facing, att.weapon, att.tech), bodyRect(target.pos));
+function boxRect(pos, facing, b) {
+  const x0 = facing > 0 ? pos.x + b[0] : pos.x - b[1], x1 = facing > 0 ? pos.x + b[1] : pos.x - b[0];
+  return { x0, x1, y0: pos.y + b[2], y1: pos.y + b[3] };
+}
+// ---- 이번 턴 행동 (검 기술 또는 특수 스킬) ----
+const actOf = f => f.action || { kind: 'basic' };
+function actSpecial(f) { const a = actOf(f); return a.kind === 'special' ? SPECIALS[f.specials[a.slot]] || null : null; }
+function canUseSpecial(f, slot, mode) {
+  const id = f.specials[slot];
+  if (!validSpecial(id, slot) || f.cd[slot] > 0) return false;
+  if (id === 'gun') return mode === 'fire' ? f.ammo > 0 : f.ammo < GUN_MAX;
+  return true;
+}
+function actionRects(f) {
+  const a = actOf(f);
+  if (a.kind === 'basic') return [techRect(f.pos, f.facing, f.weapon, f.tech)];
+  const sp = actSpecial(f);
+  if (!sp) return [];
+  if ((sp.id === 'gun' && a.mode === 'fire') || sp.id === 'whirl') return [boxRect(f.pos, f.facing, sp.box)];
+  return [];
+}
+function actionName(f) {
+  const a = actOf(f), sp = actSpecial(f);
+  if (!sp) return WEAPONS[f.weapon].techs[f.tech].name;
+  if (sp.id === 'heal') return `회복 모으기 ${Math.min(HEAL_TURNS, f.healCharge + 1)}/${HEAL_TURNS}`;
+  if (sp.id === 'gun') return a.mode === 'fire' ? `랜덤 건 발사 (${f.ammo}발)` : `랜덤 건 장전 (${Math.min(GUN_MAX, f.ammo + 1)}발째)`;
+  return sp.name;
+}
+function actionShort(f) {
+  const a = actOf(f), sp = actSpecial(f);
+  if (!sp) return null;
+  return sp.id === 'heal' ? '회복' : sp.id === 'guard' ? '방어' : sp.id === 'gun' ? (a.mode === 'fire' ? '발사' : '장전') : '회전';
+}
+// 같은 문자열 → 같은 난수 (온라인에서 양쪽이 같은 랜덤 대미지를 얻도록)
+function seededRand(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let t = (h + 0x6D2B79F5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function gunDamageRange(n) { return [25, 25 + 15 * n]; }
+function actionDamage(f, key) {
+  const sp = actSpecial(f);
+  if (!sp) return WEAPONS[f.weapon].techs[f.tech].damage;
+  if (sp.id === 'whirl') return sp.damage;
+  const [lo, hi] = gunDamageRange(Math.max(1, f.ammo));
+  const r = key ? seededRand(key) : Math.random();
+  return lo + Math.floor(r * (hi - lo + 1));
+}
+// 철벽 방어: 방어자가 바라보는 쪽(또는 거의 같은 위치)에서 온 공격을 막음
+function guarding(def, att) {
+  const sp = actSpecial(def);
+  if (!sp || sp.id !== 'guard') return false;
+  const dx = att.pos.x - def.pos.x;
+  return Math.abs(dx) < 12 || Math.sign(dx) === def.facing;
+}
 
 function drawRectArea(r, color, { alpha = 1, fill = 0.15, dash = null, lw = 2.5 } = {}) {
   ctx.save(); ctx.globalAlpha *= alpha;
@@ -254,6 +323,16 @@ function drawSlashArc(pos, facing, techId, k, color, scale = 1) {
     ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
   }
   ctx.closePath(); ctx.fillStyle = color; ctx.globalAlpha *= 0.55; ctx.fill();
+  ctx.restore();
+}
+
+// 철벽 방어 표시 (바라보는 쪽 반원 방패)
+function drawGuardArc(f, alpha) {
+  const cx = f.pos.x + f.facing * 26, cy = f.pos.y - 55, base = f.facing > 0 ? 0 : Math.PI;
+  ctx.save(); ctx.globalAlpha *= alpha;
+  ctx.strokeStyle = SPECIALS.guard.color; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx - f.facing * 20, cy, 62, base - 1.0, base + 1.0); ctx.stroke();
+  ctx.globalAlpha *= 0.15; ctx.fillStyle = SPECIALS.guard.color; ctx.beginPath(); ctx.arc(cx - f.facing * 20, cy, 62, base - 1.0, base + 1.0); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 
@@ -429,19 +508,23 @@ function drawStick(x, y, o = {}) {
   const shX = neckX, shY = neckY + 4;
   // 검 각도 (오른쪽 바라볼 때 기준, y 아래가 +)
   let sa = -0.75 + sw * 0.08;
-  const wp = WEAPONS[o.weapon || 'sword'];
+  const wp = WEAPONS[o.weapon] || WEAPONS.sword;
   if (o.pose === 'slash' && wp.techs[o.tech || 'mid']) {
     const swg = wp.techs[o.tech || 'mid'].swing;
     sa = swg[0] + (swg[1] - swg[0]) * easeOut(clamp((o.poseT || 0) / SWING_T, 0, 1));
   } else if (o.pose === 'hit') sa = -0.2;
-  else if (o.pose === 'win') sa = -1.45;
+  else if (o.pose === 'win' || o.pose === 'channel') sa = -1.45;
   else if (o.pose === 'ko') sa = 0.9;
+  else if (o.pose === 'shoot') sa = 0;
+  else if (o.pose === 'load') sa = 0.7;
+  else if (o.pose === 'guard') sa = -1.5;
+  else if (o.weapon === 'gun') sa = -0.25;
   // 앞팔: 어깨 → 팔꿈치(아래로 꺾임) → 손
   const armA = clamp(sa, -1.9, 1.5) * 0.8 + 0.15;
   const hand = [shX + Math.cos(armA) * 36 * f, shY + Math.sin(armA) * 36];
   const elbow = [(shX + hand[0]) / 2 - f * 3, (shY + hand[1]) / 2 + 8];
   // 뒷팔 (어둡게)
-  if (o.pose === 'win') L([[shX, shY], [shX - f * 14, shY - 14], [shX - f * 12, shY - 32]], LW, back);
+  if (o.pose === 'win' || o.pose === 'channel') L([[shX, shY], [shX - f * 14, shY - 14], [shX - f * 12, shY - 32]], LW, back);
   else L([[shX, shY], [shX - f * 12 - sw * 6, shY + 18], [shX - f * 6 - sw * 8, shY + 34]], LW, back);
   // 다리 (뒷다리 어둡게)
   if (o.air) {
@@ -465,6 +548,15 @@ function drawWeaponSprite(id, hx, hy, f, sa) {
   const px = -dy, py = dx;
   const wp = WEAPONS[id];
   ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([]);
+  if (id === 'gun') {   // 랜덤 건: 굵은 총신 + 손잡이
+    ctx.strokeStyle = '#3b414b'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(hx - dx * 4, hy - dy * 4); ctx.lineTo(hx + dx * 30, hy + dy * 30); ctx.stroke();
+    ctx.strokeStyle = SPECIALS.gun.color; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(hx + dx * 4, hy + dy * 4); ctx.lineTo(hx + dx * 22, hy + dy * 22); ctx.stroke();
+    ctx.strokeStyle = '#3b414b'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - dx * 3, hy + 13); ctx.stroke();
+    ctx.restore(); return;
+  }
   if (id === 'bow') {
     ctx.strokeStyle = C.hilt; ctx.lineWidth = 4;
     const base = f > 0 ? 0 : Math.PI, a0 = base - 1.2, a1 = base + 1.2;
@@ -700,7 +792,24 @@ function tutGo(d) {
   if (n !== tutPage) { tutPage = n; tutT = 0; Sfx.ui(); }
 }
 function setFacing(f) { if (B && B.phase === 'plan' && B.p.facing !== f) { B.p.facing = f; Sfx.aim(); } }
-function setTech(t) { if (B && B.phase === 'plan' && B.p.tech !== t) { B.p.tech = t; Sfx.aim(); } }
+function setTech(t) {
+  if (!B || B.phase !== 'plan') return;
+  if (B.p.tech !== t || actOf(B.p).kind !== 'basic') { B.p.tech = t; B.p.action = { kind: 'basic' }; Sfx.aim(); }
+}
+function selectSpecial(slot) {
+  if (!B || B.phase !== 'plan') return;
+  const p = B.p, id = p.specials[slot];
+  if (!id) { showToast('무기 설정에서 특수 스킬을 장착하세요'); Sfx.err(); return; }
+  if (p.cd[slot] > 0) { showToast(`${SPECIALS[id].name}: ${p.cd[slot]}턴 뒤에 다시 쓸 수 있습니다`); Sfx.err(); return; }
+  const a = actOf(p);
+  if (id === 'gun') {
+    let mode = (a.kind === 'special' && a.slot === slot) ? (a.mode === 'load' ? 'fire' : 'load') : (p.ammo > 0 ? 'fire' : 'load');
+    if (!canUseSpecial(p, slot, mode)) mode = mode === 'load' ? 'fire' : 'load';
+    if (!canUseSpecial(p, slot, mode)) { showToast('지금은 쓸 수 없습니다'); Sfx.err(); return; }
+    p.action = { kind: 'special', slot, mode };
+  } else p.action = { kind: 'special', slot };
+  Sfx.aim();
+}
 
 const OPP = () => (B && B.online ? '상대' : 'AI');
 const ME = () => (B && B.online ? '나' : '1P');
@@ -723,6 +832,8 @@ function onKeyPress(k) {
       if (k === 'Digit1' || k === 'Numpad1') setTech('mid');
       if (k === 'Digit2' || k === 'Numpad2') setTech('up');
       if (k === 'Digit3' || k === 'Numpad3') setTech('down');
+      if (k === 'Digit4' || k === 'Numpad4') selectSpecial(0);
+      if (k === 'Digit5' || k === 'Numpad5') selectSpecial(1);
     }
     if (k === 'KeyR' && B.phase === 'over' && B.overT > 1 && !B.online) startBattle();
   } else if (scene === 'loadout') {
@@ -741,7 +852,8 @@ function makeFighter(isAI, x, y) {
     pos: { x, y }, vy: 0, grounded: true, dropT: 0, dropFrom: -1, jumpQ: false, dropQ: false, air: false,
     anchor: { x, y }, from: { x, y }, planPos: { x, y }, planFacing: isAI ? -1 : 1, planTech: 'mid',
     stamina: STAMINA, facing: isAI ? -1 : 1, tech: 'mid', weapon: 'sword',
-    hp: MAX_HP, disp: MAX_HP, walk: 0, moving: false, pose: 'idle', poseT: 0, flash: 0, hits: 0
+    hp: MAX_HP, disp: MAX_HP, walk: 0, moving: false, pose: 'idle', poseT: 0, flash: 0, hits: 0,
+    specials: [null, null], cd: [0, 0], healCharge: 0, ammo: 0, action: { kind: 'basic' }, planAction: { kind: 'basic' }
   };
 }
 function startBattle(online = null) {
@@ -755,6 +867,8 @@ function startBattle(online = null) {
     fx: [], particles: [], floaters: [], shake: 0, log: [], banner: null, resultText: null,
     result: null, overT: 0, fired: false, fireT: 0, resolved: false
   };
+  B.p.specials = loadout.special.slice();
+  if (!online) B.ai.specials = [Math.random() < 0.5 ? 'heal' : 'guard', Math.random() < 0.5 ? 'gun' : 'whirl'];
   if (online) { B.p.name = '나'; B.ai.name = '상대'; B.p.facing = meLeft ? 1 : -1; B.ai.facing = -B.p.facing; }
   B.trail.push(vcopy(B.ai.pos));
   scene = 'battle'; paused = false;
@@ -770,7 +884,13 @@ function beginPlan() {
   // AI는 작전 페이즈 시작 시 비공개로 계획을 확정
   if (!B.online) {
     const plan = aiDecide();
-    ai.planPos = plan.pos; ai.planFacing = plan.facing; ai.planTech = plan.tech;
+    ai.planPos = plan.pos; ai.planFacing = plan.facing; ai.planTech = plan.tech; ai.planAction = plan.action || { kind: 'basic' };
+  }
+  // 지난 턴에 고른 행동을 이어서 쓸 수 없으면 검 공격으로 되돌림 (회복 연속 모으기는 그대로 유지)
+  const pa = actOf(p);
+  if (pa.kind === 'special') {
+    if (p.specials[pa.slot] === 'gun' && pa.mode === 'fire' && p.ammo === 0) p.action = { kind: 'special', slot: pa.slot, mode: 'load' };
+    if (!canUseSpecial(p, pa.slot, actOf(p).mode)) p.action = { kind: 'basic' };
   }
   B.banner = { text: '작전 페이즈', sub: `TURN ${B.turn} · 이동하고 공격 방향을 정하세요`, t: 0, color: C.p1 };
   B.resultText = null;
@@ -780,7 +900,7 @@ function playerReady() { Sfx.ready(); finishPlan(); }
 function finishPlan() { if (B.online) netSubmitPlan(); else startClash(); }
 function startClash() {
   const { ai } = B;
-  ai.from = vcopy(ai.anchor); ai.facing = ai.planFacing; ai.tech = ai.planTech;
+  ai.from = vcopy(ai.anchor); ai.facing = ai.planFacing; ai.tech = ai.planTech; ai.action = ai.planAction || { kind: 'basic' };
   B.p.moving = false; B.p.jumpQ = B.p.dropQ = false;
   B.phase = 'clash'; B.t = 0; B.fired = false; B.resolved = false;
   B.banner = { text: '격돌 페이즈', sub: '동시 공격!', t: 0, color: C.ai };
@@ -797,8 +917,9 @@ function clickChoice(pt) {
 function battleClick(pt) {
   if (B.phase !== 'plan' || !inArena(pt)) return;
   const c = clickChoice(pt);
-  B.p.facing = c.facing; B.p.tech = c.tech;
-  const r = techRect(B.p.pos, c.facing, B.p.weapon, c.tech);
+  B.p.facing = c.facing;
+  if (actOf(B.p).kind === 'basic') B.p.tech = c.tech;     // 특수 스킬을 고른 상태면 방향만 바꿈
+  const r = actionRects(B.p)[0] || bodyRect(B.p.pos);
   B.fx.push({ type: 'ripple', x: (r.x0 + r.x1) / 2, y: (r.y0 + r.y1) / 2, t: 0, life: 0.35, color: C.p1 });
   Sfx.aim();
 }
@@ -854,23 +975,49 @@ function aiDecide() {
   // --- 2. AI 후보 평가 ---
   const aggr = 0.25 + (ai.hp < p.hp ? 0.2 : 0) + (B.turn > 6 ? 0.1 : 0);
   const cands = [];
+  const hitProb = r => { let h = 0; for (const s of samples) if (overlap(r, bodyRect(s.pos))) h++; return h / samples.length; };
+  const toward = pos => (Math.sign(p.anchor.x - pos.x) || 1);
+  const avail = slot => ai.specials[slot] && ai.cd[slot] === 0;
+  const gunSlot = ai.specials.indexOf('gun'), whirlSlot = ai.specials.indexOf('whirl');
+  let safest = null;
   for (const sp of B.aiReach) {
     const pos = { x: sp.x, y: sp.y }, body = bodyRect(pos);
-    let danger = 0;
-    for (const s of samples) if (overlap(techRect(s.pos, s.facing, 'sword', s.tech), body)) danger++;
-    danger /= samples.length;
-    for (const facing of [-1, 1]) for (const tech of TECH_ORDER) {
-      const r = techRect(pos, facing, ai.weapon, tech);
-      let hit = 0;
-      for (const s of samples) if (overlap(r, bodyRect(s.pos))) hit++;
-      hit /= samples.length;
-      const score = hit * (1 + aggr) - danger * (1.15 - aggr) + rand(0, 0.12)
-        - Math.abs(pos.x - p.anchor.x) * 0.00025 - sp.cost * 0.00008;
-      cands.push({ pos, facing, tech, score });
+    let danger = 0, front = 0;
+    for (const s of samples) if (overlap(techRect(s.pos, s.facing, 'sword', s.tech), body)) { danger++; if (Math.sign(s.pos.x - pos.x) === toward(pos)) front++; }
+    danger /= samples.length; front /= samples.length;
+    const base = rand(0, 0.12) - Math.abs(pos.x - p.anchor.x) * 0.00025 - sp.cost * 0.00008;
+    if (!safest || danger + sp.cost * 0.0002 < safest.danger + safest.cost * 0.0002) safest = { pos, danger, front, cost: sp.cost };
+    for (const facing of [-1, 1]) {
+      for (const tech of TECH_ORDER) {
+        const hit = hitProb(techRect(pos, facing, ai.weapon, tech));
+        cands.push({ pos, facing, tech, action: { kind: 'basic' }, score: hit * (1 + aggr) - danger * (1.15 - aggr) + base });
+      }
+      if (gunSlot >= 0 && avail(gunSlot) && ai.ammo > 0) {
+        const hit = hitProb(boxRect(pos, facing, SPECIALS.gun.box)), avg = 25 + 7.5 * ai.ammo;
+        cands.push({ pos, facing, tech: 'mid', action: { kind: 'special', slot: gunSlot, mode: 'fire' },
+          score: hit * (avg / 25) * (1 + aggr) - danger * (1.15 - aggr) + base + (ai.ammo >= GUN_MAX ? 0.08 : -0.04) });
+      }
+      if (whirlSlot >= 0 && avail(whirlSlot) && facing === 1) {
+        const hit = hitProb(boxRect(pos, facing, SPECIALS.whirl.box));
+        cands.push({ pos, facing: toward(pos), tech: 'mid', action: { kind: 'special', slot: whirlSlot }, score: hit * 0.8 * (1 + aggr) - danger * (1.15 - aggr) + base });
+      }
     }
+    // 철벽 방어: 위험한 자리에서 상대를 바라보고 막기
+    const gSlot = ai.specials.indexOf('guard');
+    if (gSlot >= 0 && avail(gSlot) && front > 0.25)
+      cands.push({ pos, facing: toward(pos), tech: 'mid', action: { kind: 'special', slot: gSlot }, score: front * 0.7 - (danger - front) * 1.1 - 0.05 + base });
+  }
+  if (safest) {
+    const hSlot = ai.specials.indexOf('heal');
+    if (hSlot >= 0 && avail(hSlot) && (ai.healCharge > 0 || ai.hp <= 60))
+      cands.push({ pos: safest.pos, facing: toward(safest.pos), tech: 'mid', action: { kind: 'special', slot: hSlot },
+        score: (ai.healCharge > 0 ? 0.45 + ai.healCharge * 0.25 : 0.3) - safest.danger * 1.2 + rand(0, 0.1) });
+    if (gunSlot >= 0 && avail(gunSlot) && ai.ammo < GUN_MAX)
+      cands.push({ pos: safest.pos, facing: toward(safest.pos), tech: 'mid', action: { kind: 'special', slot: gunSlot, mode: 'load' },
+        score: 0.16 - ai.ammo * 0.03 - safest.danger * 0.9 + rand(0, 0.1) });
   }
   cands.sort((a, b) => b.score - a.score);
-  return cands[Math.floor(rand(0, Math.min(3, cands.length)))] || { pos: vcopy(ai.anchor), facing: ai.facing, tech: 'mid' };
+  return cands[Math.floor(rand(0, Math.min(3, cands.length)))] || { pos: vcopy(ai.anchor), facing: ai.facing, tech: 'mid', action: { kind: 'basic' } };
 }
 
 function recordHistory() {
@@ -886,39 +1033,89 @@ function resolveClash() {
   const { p, ai } = B;
   B.resolved = true;
   if (!B.online) recordHistory();
-  const pHit = attackHits(p, ai), aHit = attackHits(ai, p);
-  for (const [f, hit] of [[p, pHit], [ai, aHit]])
-    B.fx.push({ type: 'box', r: techRect(f.pos, f.facing, f.weapon, f.tech), t: 0, life: 0.7, color: f.color, hit });
-  const hitTarget = (attacker, target) => {
-    const dmg = WEAPONS[attacker.weapon].techs[attacker.tech].damage;
+  const keyOf = f => B.online ? `${B.online.code}|${B.turn}|${f.isAI ? (B.online.role === 'host' ? 'guest' : 'host') : B.online.role}` : null;
+  const evalHit = (att, def) => {
+    const rs = actionRects(att);
+    if (!rs.length) return { attack: false };
+    if (!rs.some(r => overlap(r, bodyRect(def.pos)))) return { attack: true, hit: false, rs };
+    if (guarding(def, att)) return { attack: true, hit: false, blocked: true, rs };
+    return { attack: true, hit: true, dmg: actionDamage(att, keyOf(att)), rs };
+  };
+  const rp = evalHit(p, ai), ra = evalHit(ai, p);
+  for (const [f, r] of [[p, rp], [ai, ra]]) {
+    if (!r.attack) continue;
+    for (const rect of r.rs) B.fx.push({ type: 'box', r: rect, t: 0, life: 0.7, color: f.color, hit: r.hit });
+    const sp = actSpecial(f);
+    if (sp && sp.id === 'gun') {
+      const mx = f.pos.x + f.facing * 40, my = f.pos.y - 62, tgt = f === p ? ai : p;
+      const ex = r.hit ? tgt.pos.x : (f.facing > 0 ? r.rs[0].x1 : r.rs[0].x0);
+      B.fx.push({ type: 'tracer', x0: mx, y0: my, x1: ex, y1: my, t: 0, life: 0.45, color: sp.color });
+    }
+  }
+  const floatAt = (f, txt, color, dy = 0, size = 22) => B.floaters.push({ x: f.pos.x, y: f.pos.y - 178 - dy, text: txt, color, size, t: 0, life: 1.9 });
+  const hitTarget = (attacker, target, dmg) => {
     target.hp = Math.max(0, target.hp - dmg);
     target.pose = 'hit'; target.poseT = 0; target.flash = 0.5; attacker.hits++;
     const sep = Math.abs(attacker.pos.x - target.pos.x) < 80 ? (target.isAI ? 32 : -32) : 0;
-    B.floaters.push({ x: target.pos.x + sep, y: target.pos.y - 150, text: `-${dmg}`, color: '#d62f2f', size: 42, t: 0, life: 1.9 });
+    B.floaters.push({ x: target.pos.x + sep, y: target.pos.y - 150, text: `-${dmg}`, color: '#d62f2f', size: dmg > 25 ? 50 : 42, t: 0, life: 1.9 });
     for (let i = 0; i < 22; i++) {
       const a = rand(0, TAU), sp = rand(120, 380);
       B.particles.push({ x: target.pos.x, y: target.pos.y - 55, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 80, t: 0, life: rand(0.35, 0.75), color: Math.random() < 0.5 ? attacker.color : '#f0a500', size: rand(3, 6) });
     }
   };
-  const missAt = attacker => {
-    const r = techRect(attacker.pos, attacker.facing, attacker.weapon, attacker.tech);
-    B.floaters.push({ x: clamp((r.x0 + r.x1) / 2, ARENA.x + 50, ARENA.x + ARENA.w - 50), y: clamp((r.y0 + r.y1) / 2, ARENA.y + 30, GROUND_Y - 20), text: 'MISS', color: '#6b7584', size: 32, t: 0, life: 1.9 });
+  const missAt = (attacker, r) => {
+    const rect = r.rs[0];
+    B.floaters.push({ x: clamp((rect.x0 + rect.x1) / 2, ARENA.x + 50, ARENA.x + ARENA.w - 50), y: clamp((rect.y0 + rect.y1) / 2, ARENA.y + 30, GROUND_Y - 20), text: 'MISS', color: '#6b7584', size: 32, t: 0, life: 1.9 });
   };
-  if (pHit) hitTarget(p, ai); else missAt(p);
-  if (aHit) hitTarget(ai, p); else missAt(ai);
-  if (pHit || aHit) { B.shake = 0.3; Sfx.hit(); }
-  if (!pHit || !aHit) Sfx.miss();
+  const outcome = (att, def, r) => {
+    if (r.hit) hitTarget(att, def, r.dmg);
+    else if (r.blocked) { floatAt(def, '막음!', SPECIALS.guard.color, -20, 30); Sfx.guard(); }
+    else if (r.attack) missAt(att, r);
+  };
+  outcome(p, ai, rp); outcome(ai, p, ra);
+  if (rp.hit || ra.hit) { B.shake = 0.3; Sfx.hit(); }
+  if ((rp.attack && !rp.hit) || (ra.attack && !ra.hit)) Sfx.miss();
+  // 특수 스킬 상태 변화 (재사용 대기 · 회복 모으기 · 탄)
+  const statusLog = {};
+  const updateSpecial = (f, damaged) => {
+    const a = actOf(f), sp = actSpecial(f);
+    for (let i = 0; i < 2; i++) if (f.cd[i] > 0) f.cd[i]--;
+    if (sp && sp.id === 'heal') {
+      if (damaged) { floatAt(f, '회복 실패', '#6b7584'); f.healCharge = 0; }
+      else {
+        f.healCharge++;
+        if (f.healCharge >= HEAL_TURNS) {
+          const before = f.hp; f.hp = Math.min(MAX_HP, f.hp + HEAL_AMOUNT); f.disp = Math.max(f.disp, f.hp);
+          f.healCharge = 0; f.cd[a.slot] = SP_COOLDOWN; statusLog[f.isAI ? 'a' : 'p'] = '회복!';
+          B.floaters.push({ x: f.pos.x, y: f.pos.y - 150, text: `+${f.hp - before}`, color: SPECIALS.heal.color, size: 44, t: 0, life: 1.9 });
+          B.fx.push({ type: 'aura', x: f.pos.x, y: f.pos.y - 50, t: 0, life: 1.0, color: SPECIALS.heal.color });
+          Sfx.heal();
+        } else floatAt(f, `회복 ${f.healCharge}/${HEAL_TURNS}`, SPECIALS.heal.color);
+      }
+    } else if (f.healCharge > 0) { f.healCharge = 0; floatAt(f, '회복 중단', '#6b7584'); }
+    if (sp && sp.id === 'gun') {
+      if (a.mode === 'load') {
+        if (damaged) { f.ammo = 0; floatAt(f, '탄 초기화', '#6b7584'); }
+        else { f.ammo = Math.min(GUN_MAX, f.ammo + 1); floatAt(f, `장전 ${f.ammo}/${GUN_MAX}`, SPECIALS.gun.color); }
+      } else { f.ammo = 0; f.cd[a.slot] = SP_COOLDOWN; }
+    }
+    if (sp && (sp.id === 'guard' || sp.id === 'whirl')) f.cd[a.slot] = SP_COOLDOWN;
+  };
+  updateSpecial(p, !!ra.hit); updateSpecial(ai, !!rp.hit);
 
   let msg, col;
-  if (pHit && aHit) { msg = '상호 명중!'; col = C.gold; }
-  else if (pHit) { msg = '명중! 예측 성공'; col = C.p1; }
-  else if (aHit) { msg = `피격! ${OPP()}에게 읽혔다`; col = C.ai; }
+  if (rp.hit && ra.hit) { msg = '상호 명중!'; col = C.gold; }
+  else if (rp.hit) { msg = '명중! 예측 성공'; col = C.p1; }
+  else if (ra.hit) { msg = `피격! ${OPP()}에게 읽혔다`; col = C.ai; }
+  else if (rp.blocked || ra.blocked) { msg = '방어 성공!'; col = SPECIALS.guard.color; }
+  else if (!rp.attack && !ra.attack) { msg = '서로 공격하지 않음'; col = C.sub; }
   else { msg = '양측 모두 빗나감!'; col = C.sub; }
   B.resultText = { msg, col, t: 0 };
-  B.log.unshift({ turn: B.turn, pHit, aHit });
+  const txt = (r, f, key) => statusLog[key] || (r.hit ? '명중' : r.blocked ? '막힘' : r.attack ? 'MISS' : actionShort(f));
+  B.log.unshift({ turn: B.turn, pHit: !!rp.hit, aHit: !!ra.hit, pTxt: txt(rp, p, 'p'), aTxt: txt(ra, ai, 'a') });
   if (B.log.length > 7) B.log.pop();
   // 다음 작전 페이즈용 잔상
-  B.ghost = { pos: vcopy(ai.pos), facing: ai.facing, tech: ai.tech, weapon: ai.weapon };
+  B.ghost = { pos: vcopy(ai.pos), facing: ai.facing, rects: actionRects(ai).map(r => Object.assign({}, r)), label: actionName(ai) };
   B.trail.push(vcopy(ai.pos)); if (B.trail.length > 5) B.trail.shift();
 }
 function endClash() {
@@ -971,8 +1168,18 @@ function updateBattle(dt) {
     ai.pos = { x: lerp(ai.from.x, ai.planPos.x, e), y: lerp(ai.from.y, ai.planPos.y, e) - arc };
     ai.air = arc > 3; ai.moving = k < 1; if (ai.moving) ai.walk += dt * 14;
     if (!B.fired && t >= CL_FIRE_MIN && p.grounded) {
-      B.fired = true; B.fireT = t; Sfx.swing();
-      for (const f of [p, ai]) { f.pose = 'slash'; f.poseT = 0; }
+      B.fired = true; B.fireT = t;
+      let swing = false, shot = false;
+      for (const f of [p, ai]) {
+        const sp = actSpecial(f), a = actOf(f);
+        f.poseT = 0;
+        if (!sp || sp.id === 'whirl') { f.pose = 'slash'; swing = true; }
+        else if (sp.id === 'gun') { f.pose = a.mode === 'fire' ? 'shoot' : 'load'; if (a.mode === 'fire') shot = true; else Sfx.load(); }
+        else if (sp.id === 'guard') f.pose = 'guard';
+        else f.pose = 'channel';
+      }
+      if (swing) Sfx.swing();
+      if (shot) Sfx.shot();
     }
     if (B.fired && !B.resolved && t >= B.fireT + SWING_T * 0.8) resolveClash();
     if (B.resolved && t >= B.fireT + SWING_T + CL_AFTER) endClash();
@@ -1026,9 +1233,10 @@ function renderBattle() {
       });
     }
     if (B.ghost) {
-      const r = techRect(B.ghost.pos, B.ghost.facing, B.ghost.weapon, B.ghost.tech);
-      drawRectArea(r, C.ai, { alpha: 0.8, fill: 0.08, dash: [8, 6], lw: 2 });
-      text(`${OPP()} 직전 공격 · ${WEAPONS[B.ghost.weapon].techs[B.ghost.tech].name}`, (r.x0 + r.x1) / 2, r.y0 + 14, 11, '#b83a3a', 'center', 700);
+      B.ghost.rects.forEach(r => drawRectArea(r, C.ai, { alpha: 0.8, fill: 0.08, dash: [8, 6], lw: 2 }));
+      const r0 = B.ghost.rects[0];
+      if (r0) text(`${OPP()} 직전 공격 · ${B.ghost.label}`, (r0.x0 + r0.x1) / 2, r0.y0 + 14, 11, '#b83a3a', 'center', 700);
+      else text(`직전 행동 · ${B.ghost.label}`, B.ghost.pos.x, B.ghost.pos.y - 172, 11, '#b83a3a', 'center', 700);
     }
     const gp = B.ghost ? B.ghost.pos : ai.anchor, gf = B.ghost ? B.ghost.facing : ai.facing;
     ctx.globalAlpha = ghostAlpha * 0.4;
@@ -1046,21 +1254,27 @@ function renderBattle() {
     ctx.save(); ctx.strokeStyle = 'rgba(47,111,209,0.6)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(p.anchor.x - 8, p.anchor.y - 3); ctx.lineTo(p.anchor.x + 8, p.anchor.y - 3);
     ctx.moveTo(p.anchor.x, p.anchor.y - 11); ctx.lineTo(p.anchor.x, p.anchor.y + 5); ctx.stroke(); ctx.restore();
-    if (inArena(mouse) && !paused) {
+    const basic = actOf(p).kind === 'basic';
+    if (inArena(mouse) && !paused && basic) {
       const c = clickChoice(mouse);
       if (c.facing !== p.facing || c.tech !== p.tech)
         drawRectArea(techRect(p.pos, c.facing, p.weapon, c.tech), C.p1, { alpha: 0.45, fill: 0.04, dash: [4, 6], lw: 1.5 });
     }
-    const r = techRect(p.pos, p.facing, p.weapon, p.tech);
-    drawRectArea(r, C.p1, { fill: 0.14, lw: 2.5 });
-    text(`내 공격 · ${WEAPONS[p.weapon].techs[p.tech].name}`, (r.x0 + r.x1) / 2, r.y1 - 12, 12, C.p1, 'center', 800);
+    const rects = actionRects(p), spc = actSpecial(p), pcol = spc ? spc.color : C.p1;
+    rects.forEach(r => drawRectArea(r, pcol, { fill: 0.14, lw: 2.5 }));
+    if (rects.length) text(`내 공격 · ${actionName(p)}`, (rects[0].x0 + rects[0].x1) / 2, rects[0].y1 - 12, 12, pcol, 'center', 800);
+    else {
+      if (spc && spc.id === 'guard') drawGuardArc(p, 0.8);
+      if (spc && spc.id === 'heal') { ctx.save(); ctx.strokeStyle = pcol; ctx.globalAlpha = 0.5 + 0.3 * Math.sin(gt * 4); ctx.lineWidth = 3; ctx.setLineDash([5, 6]); ctx.beginPath(); ctx.ellipse(p.pos.x, p.pos.y - 52, 42, 64, 0, 0, TAU); ctx.stroke(); ctx.restore(); }
+      text(`내 행동 · ${actionName(p)}`, p.pos.x, p.pos.y - 172, 12, pcol, 'center', 800);
+    }
     drawArrow(p.pos.x + p.facing * 22, p.pos.y - 50, p.pos.x + p.facing * 48, p.pos.y - 50, C.p1, 3, 8);
   }
 
   // --- 격돌: 공격 범위 경고 ---
   if (B.phase === 'clash' && !B.resolved && clashT >= CL_REVEAL * 0.8) {
     const a = clamp((clashT - CL_REVEAL * 0.8) / 0.2, 0, 1) * (0.6 + 0.4 * Math.sin(clashT * 30));
-    for (const f of [p, ai]) drawRectArea(techRect(f.pos, f.facing, f.weapon, f.tech), f.color, { alpha: a, fill: 0.16, lw: 2.5 });
+    for (const f of [p, ai]) actionRects(f).forEach(r => drawRectArea(r, f.color, { alpha: a, fill: 0.16, lw: 2.5 }));
   }
   for (const e of B.fx) {
     const k = e.t / e.life;
@@ -1069,6 +1283,14 @@ function renderBattle() {
       ctx.beginPath(); ctx.arc(e.x, e.y, 10 + k * 40, 0, TAU); ctx.stroke(); ctx.restore();
     } else if (e.type === 'box') {
       drawRectArea(e.r, e.color, { alpha: Math.max(0, 1 - k), fill: e.hit ? 0.35 : 0.15, lw: 3 });
+    } else if (e.type === 'tracer') {
+      ctx.save(); ctx.globalAlpha = 1 - k; ctx.strokeStyle = e.color; ctx.lineWidth = 5 * (1 - k) + 1; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(e.x0, e.y0); ctx.lineTo(e.x1, e.y1); ctx.stroke();
+      ctx.fillStyle = '#f0a500'; ctx.beginPath(); ctx.arc(e.x0, e.y0, 12 * (1 - k), 0, TAU); ctx.fill(); ctx.restore();
+    } else if (e.type === 'aura') {
+      ctx.save(); ctx.globalAlpha = 1 - k; ctx.strokeStyle = e.color; ctx.lineWidth = 4;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(e.x, e.y - k * 30, 20 + (k * 60 + i * 18) % 70, 0, TAU); ctx.stroke(); }
+      ctx.restore();
     }
   }
 
@@ -1077,12 +1299,17 @@ function renderBattle() {
   for (const f of list) {
     const air = f.isAI ? f.air : !f.grounded;
     drawMarker(f.pos.x, f.pos.y, f.color, f.pose === 'ko' ? null : f.name, air ? 0.5 : 1, gt + (f.isAI ? 1 : 0));
+    const fsp = (plan && f.isAI) ? null : actSpecial(f);
     drawStick(f.pos.x, f.pos.y, {
       color: f.color, facing: f.facing, moving: f.moving, walk: f.walk, idle: gt, pose: f.pose, poseT: f.poseT,
-      flash: f.flash, tech: f.tech, weapon: f.weapon, air
+      flash: f.flash, tech: f.tech, weapon: fsp && fsp.id === 'gun' ? 'gun' : f.weapon, air
     });
-    if (B.fired && f.pose === 'slash' && f.poseT < SWING_T + 0.25)
+    if (B.fired && f.pose === 'slash' && f.poseT < SWING_T + 0.25) {
       drawSlashArc(f.pos, f.facing, f.tech, f.poseT / SWING_T, f.color);
+      if (fsp && fsp.id === 'whirl') drawSlashArc(f.pos, -f.facing, 'mid', f.poseT / SWING_T, f.color);
+    }
+    if (B.fired && f.pose === 'guard') drawGuardArc(f, 1);
+    if (B.fired && f.pose === 'channel') { ctx.save(); ctx.globalAlpha = 0.6; ctx.strokeStyle = SPECIALS.heal.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(f.pos.x, f.pos.y - 52, 40 + Math.sin(gt * 8) * 4, 62, 0, 0, TAU); ctx.stroke(); ctx.restore(); }
   }
   if (plan) {   // 이동력 바 (머리 위)
     const k = p.stamina / STAMINA, bx = p.pos.x - 30, by = p.pos.y - 156;
@@ -1164,11 +1391,13 @@ function renderHud() {
   text(`${Math.ceil(p.hp)} / ${MAX_HP}`, 470, 29, 15, C.text, 'right', 800);
   drawHpBar(24, 46, 446, 26, p.hp, p.disp, C.p1, false);
   text(`명중 ${p.hits}`, 24, 86, 12, C.sub, 'left', 600);
+  drawSpecialStatus(p, 84, 86, false);
   text(OPP(), W - 24, 28, 22, C.ai, 'right', 900);
   text(B.online ? '온라인 상대' : '연습 AI', B.online ? W - 74 : W - 60, 29, 14, C.sub, 'right', 600);
   text(`${Math.ceil(ai.hp)} / ${MAX_HP}`, W - 470, 29, 15, C.text, 'left', 800);
   drawHpBar(W - 470, 46, 446, 26, ai.hp, ai.disp, C.ai, true);
   text(`명중 ${ai.hits}`, W - 24, 86, 12, C.sub, 'right', 600);
+  drawSpecialStatus(ai, W - 84, 86, true);
   const cx = W / 2;
   text(`TURN ${Math.max(1, B.turn)}`, cx, 13, 12, C.sub, 'center', 700);
   let label = '대전 준비', col = C.sub;
@@ -1196,6 +1425,27 @@ function renderHud() {
   ctx.restore();
 }
 
+function specialStatusText(f, i) {
+  const id = f.specials[i]; if (!id || !SPECIALS[id]) return null;
+  const sp = SPECIALS[id];
+  let t = sp.name;
+  if (id === 'heal') t += ` ${f.healCharge}/${HEAL_TURNS}`;
+  if (id === 'gun') t += ` ${f.ammo}/${GUN_MAX}발`;
+  if (f.cd[i] > 0) t += ` · 대기 ${f.cd[i]}`;
+  return { t, col: f.cd[i] > 0 ? C.dim : sp.color };
+}
+function drawSpecialStatus(f, x, y, right) {
+  ctx.font = font(11, 800);
+  for (let k = 0; k < 2; k++) {
+    const i = right ? 1 - k : k, st = specialStatusText(f, i);
+    if (!st) continue;
+    const w = ctx.measureText(st.t).width + 16, bx = right ? x - w : x;
+    ctx.fillStyle = '#ffffff'; rr(bx, y - 9, w, 18, 9); ctx.fill();
+    ctx.strokeStyle = st.col; ctx.lineWidth = 1.5; ctx.stroke();
+    text(st.t, bx + w / 2, y + 1, 11, st.col, 'center', 800);
+    x += right ? -(w + 6) : w + 6;
+  }
+}
 function panel(x, y, w, h, title) {
   ctx.fillStyle = 'rgba(30,40,60,0.08)'; rr(x, y + 2, w, h, 12); ctx.fill();
   ctx.fillStyle = C.panel; rr(x, y, w, h, 12); ctx.fill();
@@ -1226,21 +1476,33 @@ function renderSidePanels() {
   const bwh = (lw - 36) / 2;
   button(lx + 14, 254, bwh, 32, '← 왼쪽 Q', () => setFacing(-1), { size: 13, active: p.facing < 0, disabled: !plan });
   button(lx + 22 + bwh, 254, bwh, 32, 'E 오른쪽 →', () => setFacing(1), { size: 13, active: p.facing > 0, disabled: !plan });
-  // ③ 기술
+  // ③ 행동: 검 기술 또는 특수 스킬 (특수를 쓰면 그 턴엔 검 공격 불가)
   drawCheck(lx + 22, 308, B.phase === 'plan', C.gold);
-  text('③ 검 기술', lx + 40, 303, 15, C.text, 'left', 800);
-  text('1 / 2 / 3 또는 클릭 높이', lx + 40, 321, 10.5, C.sub, 'left', 600);
-  const tw3 = (lw - 40) / 3;
+  text('③ 행동 선택', lx + 40, 303, 15, C.text, 'left', 800);
+  text('검 1 / 2 / 3 · 특수 4 / 5', lx + 40, 321, 10.5, C.sub, 'left', 600);
+  const tw3 = (lw - 40) / 3, basic = actOf(p).kind === 'basic';
   TECH_ORDER.forEach((id, i) => {
     const t = WEAPONS[p.weapon].techs[id];
-    button(lx + 14 + i * (tw3 + 6), 334, tw3, 44, t.name, () => setTech(id), { size: 13, sub: t.key, active: p.tech === id, disabled: !plan });
+    button(lx + 14 + i * (tw3 + 6), 332, tw3, 40, t.name, () => setTech(id), { size: 13, sub: t.key, active: basic && p.tech === id, disabled: !plan });
+  });
+  const sw2 = (lw - 34) / 2;
+  [0, 1].forEach(i => {
+    const id = p.specials[i], sp = id && SPECIALS[id], a = actOf(p), on = a.kind === 'special' && a.slot === i;
+    let sub = '무기 설정에서 장착';
+    if (sp) {
+      if (p.cd[i] > 0) sub = `${p.cd[i]}턴 뒤 사용 가능`;
+      else if (id === 'heal') sub = `모으기 ${p.healCharge}/${HEAL_TURNS}`;
+      else if (id === 'gun') sub = on ? (a.mode === 'fire' ? `발사 (${p.ammo}발)` : `장전 (${p.ammo}/${GUN_MAX})`) : `탄 ${p.ammo}/${GUN_MAX}`;
+      else sub = id === 'guard' ? '앞쪽 공격 막기' : '양옆 베기';
+    }
+    button(lx + 14 + i * (sw2 + 6), 380, sw2, 46, sp ? `${i + 4} ${sp.name}` : `특수 ${i + 1} 없음`, () => selectSpecial(i),
+      { size: 13, sub, active: on, disabled: !plan || !sp || p.cd[i] > 0 });
   });
   // ④ 준비 완료
-  button(lx + 14, 396, lw - 28, 56, '준비 완료', () => playerReady(), { style: plan ? 'primary' : 'normal', disabled: !plan, sub: 'SPACE', size: 20 });
-  text(plan ? `${OPP()}의 이동과 공격은 비공개` : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 470, 11, C.dim, 'center', 600);
-  const td = WEAPONS[p.weapon].techs[p.tech];
-  text(`${td.name}: ${td.desc}`, lx + lw / 2, 494, 11, C.p1, 'center', 700);
-  text(`기본: 검 · 특수: ${specialName(loadout.special[0])} / ${specialName(loadout.special[1])}`, lx + lw / 2, 522, 10.5, C.dim, 'center', 600);
+  button(lx + 14, 436, lw - 28, 48, '준비 완료', () => playerReady(), { style: plan ? 'primary' : 'normal', disabled: !plan, sub: 'SPACE', size: 18 });
+  const asp = actSpecial(p);
+  text(asp && asp.id === 'gun' ? '5를 다시 누르면 장전 ↔ 발사 전환' : asp ? `${asp.name}: ${asp.desc}` : `${WEAPONS[p.weapon].techs[p.tech].name}: ${WEAPONS[p.weapon].techs[p.tech].desc}`, lx + lw / 2, 502, 10.5, asp ? asp.color : C.p1, 'center', 700);
+  text(plan ? `특수 스킬을 쓰는 턴엔 검 공격 불가` : B.phase === 'clash' ? '결과를 확인하세요' : '', lx + lw / 2, 524, 10.5, C.dim, 'center', 600);
 
   button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
   button(126, 670, 112, 38, '일시정지', () => { paused = true; }, { size: 15, style: 'ghost', disabled: B.phase === 'over' });
@@ -1267,9 +1529,9 @@ function renderSidePanels() {
     ctx.globalAlpha = 1 - i * 0.1;
     text(`T${l.turn}`, rx + 14, y, 12, C.sub, 'left', 700);
     text(ME(), rx + 48, y, 12, C.p1, 'left', 800);
-    text(l.pHit ? '명중' : 'MISS', rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
+    text(l.pTxt || (l.pHit ? '명중' : 'MISS'), rx + 70, y, 12, l.pHit ? C.green : C.dim, 'left', 700);
     text(OPP(), rx + 124, y, 12, C.ai, 'left', 800);
-    text(l.aHit ? '명중' : 'MISS', rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
+    text(l.aTxt || (l.aHit ? '명중' : 'MISS'), rx + 146, y, 12, l.aHit ? C.ai : C.dim, 'left', 700);
     ctx.globalAlpha = 1;
   });
   text('A/D 이동 · W 점프 · Space 준비', W - 14, 690, 11, C.dim, 'right', 600);
@@ -1380,9 +1642,9 @@ function renderHome() {
   const bw = 340, bh = 52, bx0 = W / 2 - bw / 2, by0 = 196;
   button(bx0, by0, bw, bh, '연습 대전', () => startBattle(), { style: 'primary', size: 20, sub: 'VS 연습 AI' });
   button(bx0, by0 + 62, bw, bh, '온라인 대전', () => enterOnline(), { size: 20, sub: '친구와 1:1 대전' });
-  button(bx0, by0 + 124, bw, bh, '무기 설정', () => enterLoadout(), { size: 20, sub: '기본 무기 + 특수 무기 2칸' });
+  button(bx0, by0 + 124, bw, bh, '무기 설정', () => enterLoadout(), { size: 20, sub: '기본 무기 + 특수 스킬 2칸' });
   button(bx0, by0 + 186, bw, bh, '튜토리얼', () => enterTutorial(), { style: 'gold', size: 20, sub: '처음이라면 여기부터' });
-  text(touchMode ? '모바일: 가로 화면 권장 · 오른쪽 버튼으로 이동/점프 · 경기장 탭으로 방향·기술 선택' : 'A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 기술 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
+  text(touchMode ? '모바일: 가로 화면 권장 · 오른쪽 버튼으로 이동/점프 · 경기장 탭으로 방향·기술 선택' : 'A/D 이동 · W 점프 · S 내려가기 · Q/E 방향 · 1/2/3 검 기술 · 4/5 특수 스킬 · Space 준비 완료 · ESC 일시정지', W / 2, 700, 12, '#f2ede4', 'center', 700);
   text('v0.2 · Canvas / Web Audio', W - 14, 16, 11, C.dim, 'right', 500);
 }
 
@@ -1643,16 +1905,57 @@ const TUT_PAGES = [
   {
     title: '무기 설정', tag: 'LOADOUT',
     lines: [
-      '홈 화면의 [무기 설정]에서 대전에 들고 나갈 무기를 확인하고 바꿀 수 있습니다.',
+      '홈 화면의 [무기 설정]에서 기본 무기 1개와 특수 스킬 2칸을 정합니다.',
       '기본 무기는 검으로 고정입니다. 횡베기·올려베기·내려베기 세 가지 기술을 씁니다.',
-      '특수 무기는 2칸이며 자유롭게 바꿀 수 있습니다. 같은 무기를 두 칸에 동시에 넣을 수는 없습니다.',
-      '특수 무기는 추후 업데이트로 추가됩니다. 지금은 두 칸 모두 비어 있습니다.'
+      '특수 스킬은 정해진 칸에만 들어갑니다. 1번 칸: 회복 · 철벽 방어 / 2번 칸: 랜덤 건 · 회전 베기',
+      '대전에서는 매 턴 검 기술(1·2·3)과 특수 스킬(4·5) 중 하나만 고릅니다.'
     ],
     draw(x, y, w, h, t) {
-      drawSlotCard(x + 30, y + 30, w - 60, 200, { label: '기본 무기', fixed: true, name: '검', desc: '횡베기 · 올려베기 · 내려베기',
-        drawContent: (cx, cy, cw, ch) => drawSwordCard(cx, cy, cw, ch, t) });
-      const cw = (w - 76) / 2, sel = Math.floor(t / 1.6) % 2;
-      [0, 1].forEach(i => drawSlotCard(x + 30 + i * (cw + 16), y + 250, cw, 190, { label: `특수 무기 ${i + 1}`, empty: true, selected: sel === i }));
+      drawSlotCard(x + 30, y + 30, w - 60, 170, { label: '기본 무기', fixed: true, name: '검', desc: '횡베기 · 올려베기 · 내려베기',
+        drawContent: (cx, cy, cw, ch) => drawSwordCard(cx, cy, cw, ch, t, 0.6) });
+      const cw = (w - 76) / 2;
+      [['heal', 'guard'], ['gun', 'whirl']].forEach((ids, i) => {
+        const bx = x + 30 + i * (cw + 16), by = y + 220;
+        drawSlotCard(bx, by, cw, 220, { label: `특수 ${i + 1}번 칸 전용`, selected: Math.floor(t / 1.6) % 2 === i });
+        ids.forEach((id, j) => {
+          const sp = SPECIALS[id], yy = by + 60 + j * 76;
+          ctx.fillStyle = sp.color; rr(bx + 16, yy - 18, 8, 50, 4); ctx.fill();
+          text(sp.name, bx + 34, yy - 2, 16, C.text, 'left', 900);
+          ctx.font = font(10.5, 600);
+          wrapText(sp.desc, cw - 50).slice(0, 2).forEach((ln, k) => text(ln, bx + 34, yy + 18 + k * 14, 10.5, C.sub, 'left', 600));
+        });
+      });
+    }
+  },
+  {
+    title: '특수 스킬', tag: 'SPECIAL',
+    lines: [
+      `특수 스킬을 쓰는 턴에는 검 공격을 할 수 없고, 다 쓴 스킬은 ${SP_COOLDOWN}턴 동안 다시 쓸 수 없습니다.`,
+      `회복: ${HEAL_TURNS}턴 연속으로 모으면 체력 +${HEAL_AMOUNT}. 모으는 중에 맞거나 다른 행동을 하면 처음부터입니다.`,
+      `랜덤 건: 한 턴에 1발씩 장전(최대 ${GUN_MAX}발), 발사하면 같은 층 앞쪽 멀리까지. 대미지는 25부터 무작위이고 탄이 많을수록 최대치가 커집니다(1발 25~40 · 3발 25~70). 장전 중 맞으면 탄이 사라집니다.`,
+      '철벽 방어는 바라보는 쪽 공격을 막고, 회전 베기는 같은 층 양옆을 동시에 벱니다(20).'
+    ],
+    draw(x, y, w, h, t) {
+      const g = miniStage(x + 30, y + 30, w - 60, h - 60, []);
+      const cyc = t % 4, pp = { x: x + 170, y: g }, ap = { x: x + 430, y: g };
+      // 왼쪽: 회복 모으기 → 회복
+      const stage = Math.min(3, Math.floor(cyc / 1.0));
+      drawMarker(pp.x, pp.y, C.p1, null, 1, t, SC);
+      drawStick(pp.x, pp.y, { color: C.p1, facing: 1, scale: SC, pose: 'channel', idle: t });
+      ctx.save(); ctx.globalAlpha = 0.6; ctx.strokeStyle = SPECIALS.heal.color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.ellipse(pp.x, pp.y - 42, 34 + Math.sin(t * 8) * 3, 50, 0, 0, TAU); ctx.stroke(); ctx.restore();
+      for (let i = 0; i < 3; i++) { ctx.fillStyle = i < stage ? SPECIALS.heal.color : '#d0d7e0'; ctx.beginPath(); ctx.arc(pp.x - 22 + i * 22, pp.y - 140, 8, 0, TAU); ctx.fill(); }
+      text(stage >= 3 ? `+${HEAL_AMOUNT}` : `회복 ${stage}/${HEAL_TURNS}`, pp.x, pp.y - 166, stage >= 3 ? 30 : 15, SPECIALS.heal.color, 'center', 900);
+      // 오른쪽: 랜덤 건 장전 → 발사
+      const fire = cyc > 3;
+      drawMarker(ap.x, ap.y, C.ai, null, 1, t, SC);
+      drawStick(ap.x, ap.y, { color: C.ai, facing: -1, scale: SC, weapon: 'gun', pose: fire ? 'shoot' : 'load', idle: t });
+      for (let i = 0; i < GUN_MAX; i++) { ctx.fillStyle = i < (fire ? 0 : stage) ? SPECIALS.gun.color : '#d0d7e0'; rr(ap.x - 24 + i * 18, ap.y - 148, 10, 18, 3); ctx.fill(); }
+      if (fire) {
+        ctx.save(); ctx.strokeStyle = SPECIALS.gun.color; ctx.lineWidth = 4; ctx.globalAlpha = 1 - (cyc - 3);
+        ctx.beginPath(); ctx.moveTo(ap.x - 30, ap.y - 50); ctx.lineTo(x + 60, ap.y - 50); ctx.stroke(); ctx.restore();
+        text('발사!', ap.x, ap.y - 166, 22, SPECIALS.gun.color, 'center', 900);
+      } else text(`장전 ${stage}/${GUN_MAX}`, ap.x, ap.y - 166, 15, SPECIALS.gun.color, 'center', 900);
     }
   },
   {
@@ -1897,7 +2200,10 @@ function netOnOppData(d) {
   if (d.left) { netOppLeft(); return; }
   const turn = Number(d.turn);
   if (turn >= 1 && typeof d.x === 'number' && typeof d.y === 'number')
-    B.oppPlans[turn] = { x: d.x, y: d.y, facing: d.facing === -1 ? -1 : 1, tech: TECH_ORDER.includes(d.tech) ? d.tech : 'mid' };
+    B.oppPlans[turn] = { x: d.x, y: d.y, facing: d.facing === -1 ? -1 : 1, tech: TECH_ORDER.includes(d.tech) ? d.tech : 'mid',
+      act: (d.act && d.act.kind === 'special' && (d.act.slot === 0 || d.act.slot === 1))
+        ? { kind: 'special', slot: d.act.slot, mode: d.act.mode === 'fire' ? 'fire' : 'load' } : { kind: 'basic' },
+      sp: [0, 1].map(i => (Array.isArray(d.sp) && validSpecial(d.sp[i], i)) ? d.sp[i] : null) };
 }
 function netStartMatch(code, role) {
   const opp = role === 'host' ? 'guest' : 'host';
@@ -1919,7 +2225,10 @@ function simulateLanding(f) {
 }
 async function netSubmitPlan() {
   const p = B.p, landed = simulateLanding(p);
-  B.phase = 'wait'; B.waitT = 0; B.myPlan = { turn: B.turn, x: landed.x, y: landed.y, facing: p.facing, tech: p.tech };
+  const a = actOf(p);
+  B.phase = 'wait'; B.waitT = 0;
+  B.myPlan = { turn: B.turn, x: landed.x, y: landed.y, facing: p.facing, tech: p.tech,
+    act: a.kind === 'special' ? { kind: 'special', slot: a.slot, mode: a.mode || null } : { kind: 'basic' }, sp: p.specials.slice() };
   const body = Object.assign({ left: false }, B.myPlan);
   if (NET.mode === 'p2p') { p2pSend(body); return; }
   try { await NET.mySeat.set(body); }
@@ -1930,6 +2239,7 @@ function netTryStartClash() {
   if (!o) return;
   const ai = B.ai;
   ai.planPos = { x: clamp(o.x, wallL, wallR), y: o.y }; ai.planFacing = o.facing; ai.planTech = o.tech;
+  ai.specials = o.sp; ai.planAction = (o.act.kind === 'special' && ai.specials[o.act.slot]) ? o.act : { kind: 'basic' };
   startClash();
 }
 function netOppLeft() {
@@ -2067,7 +2377,7 @@ function drawSwordCard(x, y, w, h, t, sc = 0.75) {
 function renderLoadout() {
   drawBg();
   text('무기 설정', 40, 50, 30, C.text, 'left', 900);
-  text('기본 무기 1개와 특수 무기 2칸으로 대전에 나갑니다', 40, 86, 15, C.sub, 'left', 600);
+  text('기본 무기 1개와 특수 스킬 2칸으로 대전에 나갑니다', 40, 86, 15, C.sub, 'left', 600);
   button(14, 670, 104, 38, '홈으로', () => goHome(), { size: 15, style: 'ghost' });
   // 왼쪽: 장착 칸 3개
   const px = 40, pw = 560;
@@ -2078,16 +2388,18 @@ function renderLoadout() {
   const cw = (pw - 56) / 2;
   [0, 1].forEach(i => {
     const id = loadout.special[i], x = px + 20 + i * (cw + 16), y = 372;
-    drawSlotCard(x, y, cw, 200, { label: `특수 무기 ${i + 1}`, selected: loSlot === i, empty: !id,
-      name: id ? SPECIALS[id].name : null, desc: id ? SPECIALS[id].desc : null });
+    drawSlotCard(x, y, cw, 200, { label: `특수 ${i + 1}번 칸`, selected: loSlot === i, empty: !id,
+      name: id ? SPECIALS[id].name : null, desc: id ? SPECIALS[id].desc : null,
+      drawContent: id ? (bx, by, bw, bh) => { ctx.fillStyle = SPECIALS[id].color; ctx.beginPath(); ctx.arc(bx + bw / 2, by + 86, 34, 0, TAU); ctx.fill();
+        text(SPECIALS[id].name.slice(0, 2), bx + bw / 2, by + 87, 20, '#ffffff', 'center', 900); } : null });
     buttons.push({ x, y, w: cw, h: 200, onClick: () => { loSlot = i; } });
     if (inRect(mouse, x, y, cw, 200)) hoverAny = true;
   });
-  text('칸을 눌러 바꿀 특수 무기 칸을 고르세요 (키보드 1 / 2)', px + pw / 2, 600, 12, C.dim, 'center', 600);
+  text('칸을 눌러 바꿀 칸을 고르세요 (키보드 1 / 2) · 각 스킬은 자기 칸에만 들어갑니다', px + pw / 2, 600, 12, C.dim, 'center', 600);
   // 오른쪽: 선택한 칸에 넣을 특수 무기 목록
   const lx = 640, lw = 600;
-  panel(lx, 120, lw, 520, `특수 무기 ${loSlot + 1} 칸에 장착할 무기`);
-  const list = Object.values(SPECIALS);
+  panel(lx, 120, lw, 520, `특수 ${loSlot + 1}번 칸에 장착할 스킬`);
+  const list = Object.values(SPECIALS).filter(sp => sp.slot === loSlot);
   if (!list.length) {
     const cx = lx + lw / 2;
     drawSlotCard(cx - 110, 190, 220, 170, { label: '', empty: true });
@@ -2095,9 +2407,15 @@ function renderLoadout() {
     text('특수 무기는 추후 업데이트로 추가됩니다', cx, 430, 14, C.sub, 'center', 600);
     text('추가되면 이 목록에서 골라 두 칸에 장착할 수 있습니다', cx, 454, 14, C.sub, 'center', 600);
   } else {
-    list.slice(0, 6).forEach((sp, i) => {
-      const y = 158 + i * 66, on = loadout.special[loSlot] === sp.id;
-      button(lx + 16, y, lw - 32, 56, sp.name, () => setSpecial(loSlot, on ? null : sp.id), { size: 17, sub: sp.desc || '', active: on });
+    text(`특수 ${loSlot + 1}번 칸 전용 스킬만 표시됩니다 · 다시 누르면 장착 해제`, lx + lw / 2, 548, 12, C.dim, 'center', 600);
+    list.slice(0, 5).forEach((sp, i) => {
+      const y = 170 + i * 92, on = loadout.special[loSlot] === sp.id;
+      button(lx + 16, y, lw - 32, 80, '', () => setSpecial(loSlot, on ? null : sp.id), { active: on });
+      ctx.fillStyle = sp.color; rr(lx + 32, y + 18, 8, 44, 4); ctx.fill();
+      text(sp.name, lx + 54, y + 24, 19, on ? C.p1 : C.text, 'left', 900);
+      text(sp.desc, lx + 54, y + 48, 12.5, C.sub, 'left', 700);
+      text(sp.detail || '', lx + 54, y + 66, 11, C.dim, 'left', 600);
+      if (on) text('장착 중', lx + lw - 36, y + 24, 13, C.p1, 'right', 900);
     });
   }
   button(lx + lw / 2 - 110, 570, 220, 46, '이 칸 비우기', () => setSpecial(loSlot, null), { size: 15, disabled: !loadout.special[loSlot] });
