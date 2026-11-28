@@ -3811,53 +3811,72 @@ function drawKatana(R, hand, ang, gp) {
   R.cap(vadd(hand, dv, 1.2), mid, 0.5, 0.42, 'steel', gp, false);
   R.cap(mid, tip, 0.42, 0.1, 'steel', gp, false);
 }
-// 길쭉한 손 (긴 손가락) — 아래팔 방향으로 뻗음
-function longHand(R, el, hand, gp) {
+// ---------------------------------------------------------------------
+// 공용 인체 베이스 — 앞으로 추가할 캐릭터들의 기본 체형 (RAZE·ORIN과 같은 크기)
+//   머리(달걀형) · 짧은 목 · 어깨 > 허리 < 골반의 몸통 · 보통 굵기의 팔다리 · 손발
+//   o = { top, sleeve, bottom, shoe, hair, belt, collar(R,J,G), hairStyle(R,J,G), weapon(R,J,G), weaponBack(R,J,G) }
+// ---------------------------------------------------------------------
+function baseHand(R, el, hand, gp) {
   const a = Math.atan2(hand.y - el.y, hand.x - el.x);
-  R.ell(vadd(hand, dirOf(a), 0.4), 1.25, 0.62, a, 'skin', gp, true);
+  R.ell(vadd(hand, dirOf(a), 0.25), 0.95, 0.75, a, 'skin', gp, true);
 }
-function drawKai(R, f, J) {
-  const G = { aB: 2, lB: 3, body: 4, belt: 5, lF: 6, neck: 7, head: 8, smear: 9, wpn: 10, aF: 11 };
+function drawHumanBase(R, f, J, o) {
+  const G = { aB: 2, wB: 3, lB: 4, body: 5, belt: 6, lF: 7, neck: 8, head: 9, smear: 10, wF: 11, aF: 12 };
   const { u, n, hip, neck, head, hu, hn } = J;
-  // 뒷팔 / 뒷다리 — 가늘고 긴 팔다리
+  const sleeve = o.sleeve || o.top;
+  // 뒷팔 · 뒷다리
   R.back = 1;
-  R.cap(J.shB, J.elB, 0.82, 0.68, 'shirt', G.aB, true);
-  R.cap(J.elB, J.hB, 0.66, 0.55, 'skin', G.aB, true);
-  longHand(R, J.elB, J.hB, G.aB);
-  R.cap(J.hipB, J.knB, 1.2, 0.9, 'pants', G.lB, true);
-  R.cap(J.knB, J.anB, 0.9, 0.66, 'pants', G.lB, true);
-  R.cap(J.anB, vadd(J.anB, V(1.9, 0.25)), 0.64, 0.5, 'shoe', G.lB, true);
+  R.cap(J.shB, J.elB, 1.0, 0.84, o.top, G.aB, true);
+  R.cap(J.elB, J.hB, 0.8, 0.68, sleeve, G.aB, true);
+  baseHand(R, J.elB, J.hB, G.aB);
+  if (o.weaponBack) o.weaponBack(R, J, G.wB);
+  R.cap(J.hipB, J.knB, 1.45, 1.1, o.bottom, G.lB, true);
+  R.cap(J.knB, J.anB, 1.08, 0.78, o.bottom, G.lB, true);
+  R.cap(J.anB, vadd(J.anB, V(1.9, 0.25)), 0.76, 0.6, o.shoe, G.lB, true);
   R.back = 0;
-  // 몸통: 어깨는 조금 넓고 허리는 잘록한 갈색 셔츠
-  R.poly([vadd(hip, n, -1.5), vadd(vadd(hip, n, 1.45), u, 0.2), vadd(vadd(neck, n, 2.0), u, -1.4), vadd(vadd(neck, n, 1.0), u, 0.35),
-          vadd(vadd(neck, n, -1.3), u, 0.3), vadd(vadd(neck, n, -2.1), u, -1.3)], 'shirt', G.body, true);
-  R.dline(vadd(vadd(neck, n, 0.1), u, -0.6), vadd(vadd(hip, n, 0.3), u, 1.4), '#7a4f28');      // 가운데 여밈선
-  R.poly([vadd(vadd(hip, u, 0.2), n, -1.6), vadd(vadd(hip, u, 0.2), n, 1.5), vadd(vadd(hip, u, 1.1), n, 1.55), vadd(vadd(hip, u, 1.1), n, -1.65)], 'pants', G.belt, false);
+  // 몸통: 어깨 → 잘록한 허리 → 골반
+  const waist = vadd(hip, u, 3.2);
+  R.poly([vadd(hip, n, -1.9), vadd(vadd(waist, n, -1.55), u, 0), vadd(vadd(neck, n, -2.2), u, -1.2), vadd(vadd(neck, n, -1.3), u, 0.3),
+          vadd(vadd(neck, n, 1.1), u, 0.35), vadd(vadd(neck, n, 2.1), u, -1.3), vadd(waist, n, 1.5), vadd(vadd(hip, n, 1.8), u, 0.2)], o.top, G.body, true);
+  if (o.belt) R.poly([vadd(vadd(hip, u, 0.4), n, -1.95), vadd(vadd(hip, u, 0.4), n, 1.85), vadd(vadd(hip, u, 1.3), n, 1.75), vadd(vadd(hip, u, 1.3), n, -1.85)], o.belt, G.belt, false);
   // 앞다리
-  R.cap(J.hipF, J.knF, 1.25, 0.94, 'pants', G.lF, true);
-  R.cap(J.knF, J.anF, 0.94, 0.7, 'pants', G.lF, true);
-  R.cap(J.anF, vadd(J.anF, V(1.9, 0.25)), 0.66, 0.52, 'shoe', G.lF, true);
-  // 긴 목 + 차이나 칼라(높은 깃) + 깃에 매달린 물방울 장식
-  const nb = vadd(neck, u, 0.2), nt = vadd(head, hu, -3.2);
-  R.cap(nb, nt, 0.75, 0.7, 'skin', G.neck, true);
-  R.cap(vadd(vadd(neck, u, 0.7), n, -1.05), vadd(vadd(neck, u, 0.7), n, 1.05), 0.75, 0.75, 'shirt', G.neck, true);
-  const drop = vadd(vadd(neck, u, -0.4), n, 0.7);
-  R.dline(drop, V(drop.x, drop.y + 1.6), '#7a5a28');
-  R.ell(V(drop.x, drop.y + 2.5), 0.45, 0.75, 0, 'tsuba', G.neck, false);
-  // 머리: 위아래로 긴 달걀형, 턱은 좁고 뾰족 · 뒤로 넘긴 짧은 갈색 머리
-  R.ell(vadd(head, hu, 0.4), 2.1, 3.7, J.ht, 'skin', G.head, true);
-  R.poly([vadd(vadd(head, hu, -1.0), hn, -1.4), vadd(vadd(head, hu, -1.0), hn, 1.7), vadd(vadd(head, hu, -4.3), hn, 0.75), vadd(vadd(head, hu, -4.1), hn, 0.15)], 'skin', G.head, true);
-  R.ell(vadd(vadd(head, hu, 2.9), hn, -0.5), 1.8, 1.5, J.ht, 'hair', G.head, false);
-  R.cap(vadd(vadd(head, hu, 3.0), hn, -1.0), vadd(vadd(head, hu, 1.0), hn, -2.0), 0.85, 0.45, 'hair', G.head, false);
-  R.dline(vadd(vadd(head, hu, 0.7), hn, 0.9), vadd(vadd(head, hu, 0.4), hn, 2.0), '#4a3020');         // 눈썹
-  R.dot(vadd(vadd(head, hu, -0.1), hn, 1.6), '#14141e');
+  R.cap(J.hipF, J.knF, 1.5, 1.14, o.bottom, G.lF, true);
+  R.cap(J.knF, J.anF, 1.12, 0.8, o.bottom, G.lF, true);
+  R.cap(J.anF, vadd(J.anF, V(1.9, 0.25)), 0.78, 0.62, o.shoe, G.lF, true);
+  // 목 · 깃
+  R.cap(vadd(neck, u, 0.2), vadd(head, hu, -2.6), 0.85, 0.8, 'skin', G.neck, true);
+  if (o.collar) o.collar(R, J, G.neck);
+  // 머리: 달걀형 (위가 넓고 턱이 살짝 좁음)
+  R.ell(vadd(head, hu, 0.2), 2.6, 3.25, J.ht, 'skin', G.head, true);
+  R.poly([vadd(vadd(head, hu, -0.8), hn, -1.6), vadd(vadd(head, hu, -0.8), hn, 2.0), vadd(vadd(head, hu, -3.1), hn, 1.1), vadd(vadd(head, hu, -3.2), hn, 0.0)], 'skin', G.head, true);
+  if (o.hairStyle) o.hairStyle(R, J, G.head);
+  R.dot(vadd(vadd(head, hu, 0.1), hn, 1.75), '#14141e');
   drawSmear(R, J, G.smear);
-  // 일본도 (두 손으로 잡음) + 앞팔
-  drawKatana(R, J.hF, J.wAng, G.wpn);
-  R.cap(J.shF, J.elF, 0.86, 0.72, 'shirt', G.aF, true);
-  R.cap(J.elF, J.hF, 0.7, 0.58, 'skin', G.aF, true);
-  longHand(R, J.elF, J.hF, G.aF);
+  // 앞팔 (무기는 팔 아래에)
+  if (o.weapon) o.weapon(R, J, G.wF);
+  R.cap(J.shF, J.elF, 1.05, 0.88, o.top, G.aF, true);
+  R.cap(J.elF, J.hF, 0.84, 0.7, sleeve, G.aF, true);
+  baseHand(R, J.elF, J.hF, G.aF);
 }
+// KAI: 베이스 체형 + 수수한 갈색 옷 + 짧은 갈색 머리 + 일본도
+const KAI_LOOK = {
+  top: 'shirt', sleeve: 'shirt', bottom: 'pants', shoe: 'shoe', belt: 'pants',
+  collar(R, J, gp) {
+    const { u, n, neck } = J;
+    R.cap(vadd(vadd(neck, u, 0.6), n, -1.0), vadd(vadd(neck, u, 0.6), n, 1.0), 0.7, 0.7, 'shirt', gp, true);
+    const drop = vadd(vadd(neck, u, -0.3), n, 0.6);
+    R.dline(drop, V(drop.x, drop.y + 1.3), '#7a5a28');
+    R.ell(V(drop.x, drop.y + 2.1), 0.42, 0.65, 0, 'tsuba', gp, false);
+  },
+  hairStyle(R, J, gp) {
+    const { head, hu, hn } = J;
+    R.ell(vadd(vadd(head, hu, 2.3), hn, -0.5), 2.45, 1.35, J.ht, 'hair', gp, false);
+    R.cap(vadd(vadd(head, hu, 1.9), hn, -1.7), vadd(vadd(head, hu, 0.4), hn, -2.4), 0.8, 0.5, 'hair', gp, false);
+    R.dline(vadd(vadd(head, hu, 0.95), hn, 1.1), vadd(vadd(head, hu, 0.85), hn, 2.2), '#4a3020');   // 눈썹
+  },
+  weapon(R, J, gp) { drawKatana(R, J.hF, J.wAng, gp); }
+};
+function drawKai(R, f, J) { drawHumanBase(R, f, J, KAI_LOOK); }
 // 중단 자세: 두 손으로 칼자루를 잡고 칼끝을 상대 쪽으로
 function kaiIdleArms(f, J, a) {
   const S = J.shF, br = Math.sin(f.animT * 0.1) * 0.3;
@@ -4023,7 +4042,7 @@ const CHARS = {
   KAI: {
     id: 'KAI', name: 'KAI', title: 'WANDERING BLADE', style: 'DUELIST', hp: 1000, noSkills: true, pitch: 1.0,
     walk: 1.4, run: 2.7, jumpV: -5.6, grav: 0.32, airAcc: 0.25, dashMul: 1.0,
-    dim: { hipH: 12.6, thigh: 6.6, shin: 6.6, torso: 8.8, headR: 3.9, upper: 5.3, fore: 5.1, crouchH: 17, crouchTop: 18.6 },   // 키 크고 가는 체형, 긴 머리
+    dim: { hipH: 11, thigh: 5.9, shin: 5.9, torso: 8, headR: 3.2, upper: 4.8, fore: 4.6, crouchH: 15, crouchTop: 16.2 },   // 베이스 체형 = RAZE와 같은 크기
     mats: KAI_MATS, fx: { col: PAL.orange },
     // 칼 가드: 보통 각도, 스킬이 없는 대신 가드 게이지가 조금 넉넉함
     guard: { name: 'BLADE GUARD', just: 9, gauge: 105, bsMul: 0.85, push: 1.0, jgStagger: 20, arc: 1.05, zone: false },
