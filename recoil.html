@@ -3334,7 +3334,7 @@ function computeSkeleton(f) {
   else o = idle;
   if (f.def.offhand) f.def.offhand(f, J, o);
   J.wAng = o.wAng; J.wAngB = o.wAngB; J.slide = o.slide || 0; J.smear = o.smear || null; J.spin = o.spin;
-  J.sheathed = !!o.sheathed; J.sliding = !!o.sliding; J.drawing = !!o.drawing;
+  J.sheathed = !!o.sheathed; J.sliding = !!o.sliding; J.drawing = !!o.drawing; J.bladeLen = o.bladeLen;
   const arm = (sh, target) => { const r = ik2(sh, target, d.upper, d.fore, 1); return { el: r.joint, hand: r.end }; };
   const aF = arm(shF, o.hF), aB = arm(shB, o.hB);
   J.elF = aF.el; J.hF = aF.hand; J.elB = aB.el; J.hB = aB.hand;
@@ -3378,6 +3378,11 @@ function drawSmear(R, J, gp) {
   } else if (s.type === 'thrust') {
     const dv = dirOf(s.a);
     R.cap(vadd(S, dv, s.r0 + 2), vadd(S, dv, s.r1), s.w * 0.2, s.w * 0.42, 'smear', gp, false);
+  } else if (s.type === 'flat') {                  // 가로 베기 잔상: 납작한 타원 띠 (뒤 → 앞)
+    const ca = Math.cos(s.a), sa = Math.sin(s.a), P = (x, y) => V(S.x + x * ca - y * sa, S.y + x * sa + y * ca), pts = [], n = 7;
+    for (let i = 0; i <= n; i++) { const th = PI * (1 - lerp(s.p0, s.p1, i / n)); pts.push(P(Math.cos(th) * s.r1, -Math.sin(th) * 2.6 + 0.8)); }
+    for (let i = n; i >= 0; i--) { const th = PI * (1 - lerp(s.p0, s.p1, i / n)); pts.push(P(Math.cos(th) * s.r0, -Math.sin(th) * 1.0 + 1.6)); }
+    R.poly(pts, 'smear', gp, false);
   } else if (s.type === 'ring') {
     for (let i = 0; i < 4; i++) {
       const a0 = s.a + i * PI / 2;
@@ -3902,7 +3907,7 @@ const KAI_LOOK = {
     if (J.sliding || J.drawing) {                                       // 칼집 입구까지 보이는 칼날만 그림
       const s = kaiSaya(J), d = V(s.M.x - J.hF.x, s.M.y - J.hF.y), len = Math.min(18.2, Math.hypot(d.x, d.y));
       drawKatana(R, J.hF, Math.atan2(d.y, d.x), gp, len);
-    } else if (J.swordOut) drawKatana(R, J.hF, J.wAng, gp);
+    } else if (J.swordOut) drawKatana(R, J.hF, J.wAng, gp, J.bladeLen || 18.2);
   }
 };
 function drawKai(R, f, J) {
@@ -3983,6 +3988,45 @@ function slashArms(f, J, idle, reach, k, ph) {
   const rp = Math.min(1, (k - m.startup - m.active) / Math.max(1, m.recovery + f.recExtra)), e = ease(rp), over = A1 + sg * 0.55 * (1 - rp);
   return { hF: vlerp(at(over, reach * 0.85), idle.hF, e), wAng: lerp(over + sg * 0.35, idle.wAng, e), attacking: true };
 }
+// 가로 베기: 옆에서 보면 칼이 몸 뒤 → (화면 쪽으로 짧아 보이며) → 앞으로 수평으로 돌아 나옴
+//   깊이 회전은 칼 길이(원근으로 짧아짐)로 표현해 위아래로 내리치는 느낌이 나지 않게 함
+function horizArms(f, J, idle, reach, k, ph) {
+  const m = f.move, a = f.moveAim, S = J.shF, tl = m.tilt || 0, sh = m.shape, B = 18.2;
+  if (ph === 's' && f.iai) {                                      // 칼집에서 뽑으며
+    const sy = kaiSaya(J), p = (k + 1) / m.startup;
+    return { hF: vadd(sy.M, sy.sd, -(2.6 + 15.4 * p)), wAng: sy.ang, hB: vadd(sy.M, sy.sd, 1.4), wAngB: 0, attacking: true, drawing: true };
+  }
+  const fwd = dirOf(a), back = PI - a;
+  if (ph === 's') {                                               // 칼을 옆 뒤로 수평하게 젖힘
+    const p = (k + 1) / m.startup;
+    const th = PI * Math.min(1, p * 1.15), c = Math.cos(th);       // 칼끝이 화면 쪽으로 돌며(짧아짐) 뒤로 넘어감 — 세로로 회전하지 않음
+    return { hF: vadd(vadd(S, fwd, lerp(3, -2.5, p)), V(0, 2.4 - Math.sin(th) * 1.0)), wAng: c >= 0 ? a : back - tl * 0.5, bladeLen: Math.max(3, B * Math.abs(c)), attacking: true };
+  }
+  const sweep = (t, prev) => {                                    // t: 0(뒤) → 1(앞)
+    const th = PI * (1 - t), c = Math.cos(th);
+    const hF = vadd(vadd(S, fwd, lerp(-2.5, reach * 0.95, t)), V(0, 2.4 * (1 - t) - Math.sin(th) * 1.2));
+    const ang = c < 0 ? back - tl * (0.5 - t) : a + tl * (t - 0.5);
+    return { hF, wAng: ang, bladeLen: Math.max(3, B * Math.abs(c)) };
+  };
+  if (ph === 'a') {
+    const p = (k - m.startup + 1) / m.active, pp = (k - m.startup) / m.active, o = sweep(p);
+    return Object.assign(o, { attacking: true, smear: { type: 'flat', a: a + tl * (p - 0.5), p0: Math.max(0, pp - 0.15), p1: p, r0: sh.r0, r1: sh.r1 } });
+  }
+  // 후딜: 칼이 앞을 지나 반대편(화면 안쪽)으로 흘러가며 짧아졌다가 자세로 돌아옴
+  const rp = Math.min(1, (k - m.startup - m.active) / Math.max(1, m.recovery + f.recExtra)), e = ease(rp);
+  const th = -PI * 0.45 * Math.min(1, rp * 2), len = Math.max(4, B * Math.cos(th));
+  return { hF: vlerp(vadd(S, fwd, reach * 0.9), idle.hF, e), wAng: lerp(a + tl * 0.5, idle.wAng, e), bladeLen: lerp(len, B, e), attacking: true };
+}
+// 가로 베기 판정: 칼이 앞쪽으로 나온 프레임부터 조준 높이의 수평 띠
+function horizBoxes(f, J, k) {
+  const m = f.move, ph = f.phaseOf(k);
+  if (ph !== 'a') return [];
+  const p = (k - m.startup + 1) / m.active;
+  if (p < 0.4) return [];
+  const sh = m.shape, S = J.shF, dv = dirOf(f.moveAim + (m.tilt || 0) * (p - 0.5)), out = [], s2 = sh.size;
+  for (let r = sh.r0; r <= sh.r1; r += s2 * 0.8) { const c = vadd(S, dv, r); out.push({ x: c.x - s2 / 2, y: c.y - s2 / 2, w: s2, h: s2 }); }
+  return out;
+}
 const kickArms = (f, J) => (f.drawnT || 0) > 12 ? { hF: vadd(J.shF, V(2.8, 3.0)), wAng: -1.05, attacking: true }   // 칼을 뽑은 상태면 세워 들고
   : Object.assign(kaiIdleArms(f, J, 'idle'), { attacking: true });                                                   // 꽂혀 있으면 칼집에 손을 둔 채 발차기
 
@@ -4011,20 +4055,20 @@ function kaiStart(f, inp) {
   return 'N1';
 }
 const KAI_MOVES = {
-  N1: { name: 'QUICK CUT', arms: slashArms, sword: true, normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.3, whiffExtra: 6, lean: 0.3,
-    shape: { type: 'arc', from: -1.25, to: 0.85, r0: 8, r1: 25, size: 3 },      // 짧게 휘둘러 베기
+  N1: { name: 'QUICK CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.3, whiffExtra: 6, lean: 0.3,
+    tilt: 0, shape: { type: 'thrust', r0: 6, r1: 25, size: 4.5 },        // 가로로 짧게 베기
     hit: { dmg: 20, hitstun: 15, blockstun: 9, kb: 1.0, hitstop: 4, guardDmg: 8, blockPush: 1.4 }, onFrame: stepForward(0.7) },
-  N2: { name: 'KESA CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.5, whiffExtra: 7, lean: 0.35,
-    shape: { type: 'arc', from: -1.7, to: 1.05, r0: 8, r1: 26, size: 3.5 },     // 머리 위에서 비스듬히 크게 내려 베기
+  N2: { name: 'SIDE CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, startup: 5, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.5, whiffExtra: 7, lean: 0.35,
+    tilt: 0.3, shape: { type: 'thrust', r0: 6, r1: 26, size: 5 },       // 가로로 크게 베며 살짝 내려감
     hit: { dmg: 26, hitstun: 16, blockstun: 10, kb: 1.3, hitstop: 5, guardDmg: 10, blockPush: 1.6 }, onFrame: stepForward(1.0) },
-  N3: { name: 'GYAKU CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 11, chain: kaiNext, whiffRecoil: 1.6, whiffExtra: 8, lean: 0.3,
-    shape: { type: 'arc', from: 1.15, to: -1.3, r0: 8, r1: 26, size: 3.5 },      // 아래에서 거슬러 크게 올려 베기
+  N3: { name: 'RETURN CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, startup: 5, active: 3, recovery: 11, chain: kaiNext, whiffRecoil: 1.6, whiffExtra: 8, lean: 0.3,
+    tilt: -0.3, shape: { type: 'thrust', r0: 6, r1: 26, size: 5 },      // 가로로 크게 베며 살짝 올라감
     hit: { dmg: 30, hitstun: 18, blockstun: 11, kb: 1.2, kbY: -0.8, hitstop: 5, guardDmg: 12, blockPush: 1.8 }, onFrame: stepForward(0.8) },
   N4: { name: 'ROUNDHOUSE', normal: true, startup: 7, active: 4, recovery: 15, chain: kaiNext, whiffRecoil: 2.0, whiffExtra: 10, aimClamp: [-0.7, 0.3],
     body: kickBody({ lean: -0.4 }), boxesAt: legBoxes, arms: kickArms,
     hit: { dmg: 40, hitstun: 26, blockstun: 13, kb: 3.0, kbY: -1.4, knockdown: true, hitstop: 8, shake: 2, guardDmg: 18, blockPush: 2.6 }, onFrame: stepForward(0.5) },
-  UP: { name: 'RISING CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 13, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 9, aimClamp: [-1.0, -0.45], lean: 0.1,
-    shape: { type: 'arc', from: 1.25, to: -0.9, r0: 7, r1: 25, size: 4 },     // 앞 아래에서 위로 베어 올림
+  UP: { name: 'HIGH CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, startup: 5, active: 3, recovery: 13, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 9, aimClamp: [-0.75, -0.3], lean: 0.1,
+    tilt: -0.25, shape: { type: 'thrust', r0: 6, r1: 25, size: 5 },     // 위쪽을 가로로 베어 띄움
     hit: { dmg: 34, hitstun: 26, blockstun: 12, kb: 0.6, kbY: -4.8, hitstop: 7, shake: 1, guardDmg: 14, blockPush: 1.6 },   // 띄우기 → 점프 캔슬로 공중 콤보
     onFrame: stepForward(0.9) },
   LK: { name: 'LOW KICK', normal: true, startup: 4, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.2, whiffExtra: 7, aimClamp: [0.35, 0.8],
@@ -4042,8 +4086,8 @@ const KAI_MOVES = {
       return false;
     } },
   // ---- 공중 ----
-  aN1: { name: 'AIR CUT', arms: slashArms, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 9, whiffRecoil: 0.4, whiffExtra: 5,
-    shape: { type: 'arc', from: -1.4, to: 1.0, r0: 8, r1: 24, size: 3.5 },
+  aN1: { name: 'AIR CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 9, whiffRecoil: 0.4, whiffExtra: 5,
+    tilt: 0.15, shape: { type: 'thrust', r0: 6, r1: 24, size: 4.5 },
     hit: { dmg: 22, hitstun: 22, blockstun: 10, kb: 0.8, kbY: -1.8, hitstop: 4, guardDmg: 9, blockPush: 1.3 } },
   aN2: { name: 'AIR KNEE', normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 4, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
     body: kneeBody, boxesAt: kneeBoxes, arms: kickArms,
@@ -4051,8 +4095,8 @@ const KAI_MOVES = {
   aN3: { name: 'AXE KICK', normal: true, air: true, landCancel: true, startup: 6, active: 4, recovery: 13, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.35, 1.3],
     body: kickBody({ lean: -0.2 }), boxesAt: legBoxes, arms: kickArms,
     hit: { dmg: 38, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 8, shake: 2, guardDmg: 16, blockPush: 2 } },
-  aUP: { name: 'AIR RISING', arms: slashArms, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
-    aimClamp: [-1.0, -0.45], shape: { type: 'arc', from: 1.25, to: -0.9, r0: 7, r1: 24, size: 4 },
+  aUP: { name: 'AIR HIGH CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+    aimClamp: [-0.75, -0.3], tilt: -0.25, shape: { type: 'thrust', r0: 6, r1: 24, size: 5 },
     hit: { dmg: 26, hitstun: 24, blockstun: 11, kb: 0.6, kbY: -3.6, hitstop: 5, guardDmg: 11, blockPush: 1.2 } },
   aST: { name: 'STOMP', normal: true, air: true, landCancel: true, startup: 5, active: 5, recovery: 14, whiffRecoil: 0.3, whiffExtra: 8, aimClamp: [1.05, 1.45],
     body: kickBody({ lean: 0.1, len: 0.95 }), boxesAt: legBoxes, arms: kickArms,
@@ -6302,7 +6346,7 @@ const CharScene = {
       for (let b = 0; b < 5; b++) R(32 + b * 8, sy, 7, 6, b < v ? PAL.cyan : PAL.dgray);
     });
     const mv = d.moves, lines = d.noSkills
-      ? [['N', 'QUICK > KESA > GYAKU > ROUNDHOUSE'], ['UP', 'RISING CUT   LOW: LOW KICK > SWEEP'], ['RUN', 'DASH KNEE   AIR: 5 MOVES'], ['G', d.guard.name + '  (NO SKILLS)']]
+      ? [['N', 'QUICK > SIDE > RETURN > ROUNDHOUSE'], ['UP', 'HIGH CUT   LOW: LOW KICK > SWEEP'], ['RUN', 'DASH KNEE   AIR: 5 MOVES'], ['G', d.guard.name + '  (NO SKILLS)']]
       : [['Q', mv.Q.name], ['E', mv.E.name], ['R', mv.R.name], ['G', d.guard.name]];
     lines.forEach(([k, nm], j) => {
       const sy = y + 6 + j * 10;
