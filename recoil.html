@@ -4255,28 +4255,28 @@ const AURA_BLESS_MOVE = (air) => ({ name: 'TIDE BLESS', skill: 's3', cd: 960, ai
   arms(f, J) { return { hF: vadd(J.shF, V(2.4, -3.6)), wAng: 0, hB: vadd(J.shB, V(-2.4, -3.2)), wAngB: 0, attacking: true, smear: null }; },
   onFrame(f, k) { if (k === f.move.startup) { auraBless(f); FX.ring(f.x, f.y - 16, PAL.green, 22); } if (!f.onGround) f.vy = Math.min(f.vy, 0.6); return false; } });
 const AURA_LASH_MOVE = (air) => ({ name: 'ZAP LASH', skill: 's1', cd: 360, air, landCancel: air, startup: 6, active: 8, recovery: 14, hitEvery: 4, whiffRecoil: 1.4, whiffExtra: 10,
-  shape: { type: 'arc', from: -0.9, to: 0.7, r0: 8, r1: 32, size: 3.5 },     // 해파리 촉수 전기 채찍 (2타)
+  shape: { type: 'arc', from: -0.9, to: 0.7, r0: 6, r1: 25, size: 3.5 },     // 해파리 촉수 전기 채찍 (2타)
   hit: { dmg: 16, hitstun: 18, minStun: 14, blockstun: 10, kb: 1.2, kbY: -1.0, hitstop: 4, guardDmg: 10, blockPush: 1.2, chip: 0.1 },
   finisher: { dmg: 22, hitstun: 24, kb: 2.2, kbY: -2.4, hitstop: 7, shake: 1 } });
 const AURA_MOVES = {
   N1: { name: 'STING', normal: true, startup: 5, active: 3, recovery: 10, chain: 'N2', whiffRecoil: 1.4, whiffExtra: 7, lean: 0.2,
-    shape: { type: 'thrust', r0: 8, r1: 26, size: 3.5 },
+    shape: { type: 'thrust', r0: 6, r1: 21, size: 3.5 },
     hit: { dmg: 22, hitstun: 16, blockstun: 10, kb: 1.2, hitstop: 4, guardDmg: 9, blockPush: 1.5 }, onFrame: stepForward(0.5) },
   N2: { name: 'ARC ZAP', normal: true, startup: 6, active: 3, recovery: 12, chain: 'N3', whiffRecoil: 1.6, whiffExtra: 8,
-    shape: { type: 'arc', from: -0.8, to: 0.55, r0: 8, r1: 26, size: 3.5 },
+    shape: { type: 'arc', from: -0.8, to: 0.55, r0: 6, r1: 20, size: 3.5 },
     hit: { dmg: 26, hitstun: 17, blockstun: 11, kb: 1.4, hitstop: 5, guardDmg: 11, blockPush: 1.7 }, onFrame: stepForward(0.5) },
   N3: { name: 'JOLT', normal: true, startup: 8, active: 4, recovery: 16, whiffRecoil: 2.0, whiffExtra: 10, lean: 0.15,
-    shape: { type: 'thrust', r0: 8, r1: 28, size: 4 },
+    shape: { type: 'thrust', r0: 6, r1: 21, size: 4 },
     hit: { dmg: 34, hitstun: 26, blockstun: 13, kb: 0.7, kbY: -4.4, hitstop: 7, shake: 1, guardDmg: 16, blockPush: 2.2 },   // 띄우기
     onFrame: stepForward(0.4) },
   aN1: { name: 'AIR STING', normal: true, air: true, landCancel: true, chain: 'aN2', startup: 5, active: 4, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
-    shape: { type: 'thrust', r0: 8, r1: 25, size: 3.5 },
+    shape: { type: 'thrust', r0: 6, r1: 20, size: 3.5 },
     hit: { dmg: 24, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -1.8, hitstop: 5, guardDmg: 10, blockPush: 1.4 } },
   aN2: { name: 'AIR ARC', normal: true, air: true, landCancel: true, chain: 'aN3', startup: 5, active: 4, recovery: 11, whiffRecoil: 0.4, whiffExtra: 6,
-    shape: { type: 'arc', from: -0.8, to: 0.7, r0: 8, r1: 24, size: 3.5 },
+    shape: { type: 'arc', from: -0.8, to: 0.7, r0: 6, r1: 19, size: 3.5 },
     hit: { dmg: 24, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -2.2, hitstop: 5, guardDmg: 10, blockPush: 1.4 } },
   aN3: { name: 'DOWN JOLT', normal: true, air: true, landCancel: true, startup: 7, active: 4, recovery: 14, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.4, 1.45],
-    shape: { type: 'thrust', r0: 8, r1: 26, size: 4 },
+    shape: { type: 'thrust', r0: 6, r1: 20, size: 4 },
     hit: { dmg: 32, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 8, shake: 2, guardDmg: 14, blockPush: 2 } },
   Q: AURA_LASH_MOVE(false), aQ: AURA_LASH_MOVE(true),
   E: AURA_HEAL_MOVE(false), aE: AURA_HEAL_MOVE(true),
@@ -5304,7 +5304,7 @@ const SKILL_ICONS_AIR = {
 const CHAR_INFO = {
   RAZE: { ko: '근접 연타형', desc: '쌍단검과 돌진으로 몰아붙이는 그림자 결투가', stats: [['SPD', 5], ['RNG', 2], ['POW', 3], ['DEF', 2]] },
   ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] },
-  AURA: { ko: '해파리 서포터', desc: '등 뒤의 큰 해파리가 전기로 공격 · 회복과 강화로 팀을 돕는다', stats: [['SPD', 3], ['RNG', 3], ['POW', 2], ['DEF', 2]] },
+  AURA: { ko: '해파리 서포터', desc: '등 뒤의 큰 해파리가 전기로 공격 · 회복과 강화로 팀을 돕는다', stats: [['SPD', 3], ['RNG', 2], ['POW', 2], ['DEF', 2]] },
   KAI: { ko: '일본도 평타형', desc: '스킬 없이 평타만! 상황·조준·순서마다 다른 평타 13종', stats: [['SPD', 4], ['RNG', 3], ['POW', 3], ['DEF', 3]] }
 };
 
@@ -5595,7 +5595,7 @@ class AI {
   threatPoint(o) { return predictThreat(o, this.me); }
   neutral(dist, fwd, back) {
     const me = this.me, o = me.opp, L = this.L, ch = me.def.id, cd = me.cd;
-    const pref = ch === 'ORIN' ? 40 : ch === 'AURA' ? 26 : 20, dirOf = k => (k === 'r' ? 1 : -1);
+    const pref = ch === 'ORIN' ? 40 : ch === 'AURA' ? 20 : 20, dirOf = k => (k === 'r' ? 1 : -1);
     if (ch === 'AURA' && me.onGround) {                              // 서포터: 다치면 회복, 가까우면 강화 + 밀쳐내기
       const hurtAlly = alliesOf(me).some(a => a.hp / a.maxHp < 0.6 && Math.abs(a.x - me.x) < 90);
       if (cd.s2 === 0 && hurtAlly && dist > 28 && this.roll(0.5)) { this.press('s2'); return; }
