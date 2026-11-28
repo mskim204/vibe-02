@@ -2993,7 +2993,7 @@ const UNIT_DATA=[
 ['mecha','무타 코키치 (메카마루)','준1급 주술사',4,'機',18,SK('울트라 캐논','one',6),SK('미라클 캐논','all',4)],
 ['kamo','카모 노리토시','준1급 주술사',4,'血',18,SK('적혈조술: 천혈','one',7,{pierce:1}),SK('적박인','rand',2,{hits:4})],
 ['mai','젠인 마이','3급 주술사',2,'弾',14,SK('리볼버 사격','one',5),SK('구축술식: 탄환 생성','one',4,{hits:2})],
-['nanami','나나미 켄토','1급 주술사',5,'七',26,SK('십획주법: 7:3 타격','one',7,{crit:1}),SK('와락와락','all',4)],
+['nanami','나나미 켄토','1급 주술사',5,'七',26,SK('십획주법: 7:3 타격','one',7,{crit:1}),SK('와락와락','all',4),UL('시간외 노동','one',14,['haibara'],['m_vow'],{transform:1,crit:1})],
 ['todo','토도 아오이','1급 주술사',5,'拍',27,SK('불의유희','one',6,{swap:1}),SK('박수 콤보','one',3,{hits:3})],
 ['meimei','메이메이','1급 주술사',5,'烏',22,SK('전투도끼 베기','one',7),SK('흑조조술: 버드 스트라이크','one',12,{self:3})],
 ['kusakabe','쿠사카베 아츠야','1급 주술사',5,'剣',24,SK('신카게류 발도','one',6),SK('석양의 형','front',5,{counter:3})],
@@ -3025,6 +3025,12 @@ const UNIT_DATA=[
 ['gyokken','옥견','십종영법 식신',3,'',14,SK('물어뜯기','one',5),SK('-','one',0)],
 ['nue','누에','십종영법 식신',3,'',12,SK('전격 강하','one',5,{pierce:1}),SK('-','one',0)],
 ['daija','대사','십종영법 식신',4,'',18,SK('대사의 아가리','one',7),SK('-','one',0)],
+['miguel','미구엘','게토의 동료 주술사',5,'',26,SK('흑승 채찍','one',7),SK('흑승 난무','front',5,{stun:1}),UL('흑승 · 술식 무효화','front',14,['s_rope'],['m_veil','m_black'],{pierce:1,ignoreProt:1,seal:1})],
+['ogami','오가미 할머니','저주사 · 강령술사',3,'',14,SK('지팡이 일격','one',4),SK('저주의 주문','one',3,{stun:1}),UL('강령술: 후시구로 토우지','one',8,['ogami_grandson'],['m_vow','m_uzu'],{swapIn:'toji'})],
+['haibara','하이바라 유','주술고전 2학년 (과거)',2,'',13,SK('주력 타격','one',4),SK('-','one',0)],
+['mimiko','미미코 · 나나코','게토를 따르는 쌍둥이',3,'',15,SK('휴대폰 저주 · 인형 저주','one',5),SK('-','one',0)],
+['kechizu','케치즈','구상주령 9상',2,'',14,SK('부식 혈액 분사','one',4,{drain:1}),SK('익체 돌진','front',3)],
+['rika_full','리카 (완전 현현)','특급 과주원령 · 각성',6,'',50,SK('리카의 일격','one',14),SK('순애빔','all',10,{pierce:1})],
 ['mahoraga','마허라','팔악검 이계신장',6,'',60,SK('퇴마의 검','one',12,{pierce:1}),SK('법륜 맹공','front',8)],
 ];
 const SUB_DATA=[
@@ -3041,6 +3047,8 @@ const SUB_DATA=[
 ['s_kogane','코가네','사멸회유 심판','',10,{atk:1,regen:2},'타격당 피해 +1, 내 턴이 시작될 때마다 메인 유닛 체력 2 회복.'],
 ['mansho','만상','십종영법 식신','',16,{red:3},'거대한 코끼리 식신이 물을 뿜어 막아선다: 메인 유닛이 받는 피해 -3.'],
 ['datto','탈토','십종영법 식신','',8,{red:1,regen:2},'토끼 떼가 시선을 흐린다: 메인 유닛이 받는 피해 -1, 내 턴 시작마다 체력 2 회복.'],
+['ogami_grandson','오가미의 손자','강령의 그릇','',12,{red:1},'메인 유닛이 받는 피해 -1. 오가미 할머니 「강령술」의 그릇 (사용하면 후시구로 토우지로 바뀜).'],
+['nitta','닛타 아카리','보조감독 · 치유 술식','',10,{regen:4,red:1},'내 턴이 시작될 때마다 메인 유닛 체력 4 회복, 받는 피해 -1.'],
 ['s_rope','흑승','특급 주구','',14,{red:2,pierce:1},'메인 유닛이 받는 피해 -2. 메인 유닛의 공격이 상대의 피해 경감·반격 태세·간이영역을 무시.'],
 ];
 const MAGIC_DATA=[
@@ -3080,6 +3088,8 @@ const DUAL={
  gyokken:{n:'추적 후각',fx:{atk:1,boost:{megumi:3}},d:'메인 유닛 타격당 피해 +1 (후시구로 메구미는 +3). 메구미 「감합암예정」 해방 조건.'},
  nue:{n:'뇌운 엄호',fx:{aoe:2,red:1},d:'메인 유닛의 범위 공격 타격당 +2, 받는 피해 -1.'},
  daija:{n:'지중 매복',fx:{atk:1,red:1},d:'메인 유닛 타격당 피해 +1, 받는 피해 -1.'},
+ haibara:{n:'선배 보좌',fx:{atk:1,red:1,boost:{nanami:3}},d:'메인 유닛 타격당 피해 +1 (나나미 켄토는 +3), 받는 피해 -1. 나나미 「시간외 노동」 해방 조건.'},
+ mimiko:{n:'게토님을 위해',fx:{atk:2,boost:{geto:4}},d:'메인 유닛 타격당 피해 +2 (게토 스구루는 +4).'},
 };
 for(const id in DUAL){const C=CARDS[id];if(!C)continue;C.dual=true;C.fx=DUAL[id].fx;C.pas=DUAL[id];C.sk=[C.sk[0]];}
 const isDual=id=>!!(CARDS[id]&&CARDS[id].dual);
@@ -3087,6 +3097,9 @@ const canSub=id=>CARDS[id].type==='sub'||isDual(id);
 /* 마허라: 항상 장착(덱에 넣지 않음). 뽑기로는 나오지 않고 조건을 맞추면 소환 */
 const SHIKI=['gyokken','nue','daija','mansho','datto'];
 CARDS.mahoraga.special=true;
+CARDS.rika_full.special=true;
+/* 리카 완전 현현 후 서브 필드로 물러난 유타의 버프 */
+CARDS.yuta.fx={atk:3,red:2,boost:{rika_full:5}};
 const ALL_IDS=Object.keys(CARDS).filter(id=>!CARDS[id].special);
 const TYPE_NAME={unit:'유닛 카드',sub:'서브 카드',magic:'마법 카드'};
 /* 두 번째 궁극기 (애니메이션에서 궁극기급 기술이 두 개인 캐릭터). 열쇠 서브 카드는 같고 촉매 마법이 다름 */
@@ -3096,7 +3109,7 @@ const ULT2={
  geto:UL('백귀야행','rand',10,['fly','centi','grass'],['m_black','m_simple'],{hits:3,pierce:1}),
  jogo:UL('극번 「운」','all',13,['kaizo','fly'],['m_uzu','m_simple'],{pierce:1}),
  mahito:UL('편살즉영체','one',12,['kaizo'],['m_black','m_vow'],{transform:1}),
- yuta:UL('리카 완전 현현','all',8,['s_rika'],['m_vow','m_veil'],{transform:1}),
+ yuta:UL('리카 완전 현현','all',8,['s_rika'],['m_vow'],{need:'halfhp',swapIn:'rika_full',toSub:1}),
  toji:UL('천역모 관통','one',24,['s_tenten'],['m_vow','m_veil'],{pierce:1,ignoreProt:1}),
 };
 for(const id in ULT2)if(CARDS[id])CARDS[id].ult2=ULT2[id];
@@ -3122,12 +3135,16 @@ const SYN=[
  {n:'켄자쿠 일파',m:['kenjaku','mahito','uraume','jogo'],atk:1,red:1,max:3},
  {n:'저주의 왕과 시종',m:['sukuna','uraume'],atk:2,red:2},
  {n:'피의 형제',m:['choso','yuji'],atk:1,regen:4},
- {n:'구상주령 형제',m:['choso','eso'],atk:2,regen:3},
- {n:'구상주령의 아버지',m:['kenjaku','choso'],atk:2},
+ {n:'구상주령 형제',m:['choso','eso','kechizu'],atk:2,regen:3,max:2},
+ {n:'구상주령의 아버지',m:['kenjaku','choso','kechizu'],atk:2,max:2},
  {n:'하급 주령 무리',m:['fly','centi','grass','kaizo'],atk:2,max:3},
  {n:'사멸회유',m:['hakari','kashimo','higuruma','takaba','s_kogane'],atk:1,red:1,max:3},
  {n:'대박 콤비',m:['hakari','kirara'],atk:2,red:1},
  {n:'보조 조직',m:['s_ijichi','s_shoko'],sup:1,regen:3,red:1},
+ {n:'나나미와 하이바라',m:['nanami','haibara'],atk:2,red:1},
+ {n:'게토 일파',m:['geto','mimiko','miguel'],atk:1,red:1,max:2},
+ {n:'강령',m:['ogami','ogami_grandson'],atk:1},
+ {n:'순애',m:['rika_full','yuta'],atk:2,red:1},
  {n:'십종영법',m:['megumi','gyokken','nue','daija','mansho','datto'],atk:1,red:1,max:3},
 ];
 const SYN_CAP={atk:4,red:3};
@@ -3152,10 +3169,11 @@ function skillDesc(s){
  else if(s.t==='rand')t=`${typ}에게 ${s.p} 피해 × ${s.hits}회`;
  else t=`${typ}에 ${s.p} 피해${s.hits?` × ${s.hits}회`:''}`;
  const ex=[];
- if(s.pierce)ex.push('방어 무시');if(s.crit)ex.push('40% 확률 치명타(2배)');if(s.drain)ex.push('준 피해의 절반 흡수');if(s.stun)ex.push(`상대 다음 턴 서브 행동 -${s.stun}`);if(s.seal)ex.push(s.t==='one'?'적중한 유닛 봉인':'상대 메인 유닛 봉인');if(s.swap)ex.push('상대 메인 유닛 적중 시 대기 필드로 밀어냄');if(s.self)ex.push(`자신도 ${s.self} 피해`);if(s.counter&&s.t!=='guard')ex.push(`이후 반격 태세(${s.counter})`);if(s.heal)ex.push(`자신 체력 +${s.heal}`);if(s.selfKill)ex.push('사용 후 자신 소멸');if(s.transform)ex.push('변신! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.jackpot)ex.push('대박! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.ignoreProt)ex.push('장막·간이영역 무시');
+ if(s.pierce)ex.push('방어 무시');if(s.crit)ex.push('40% 확률 치명타(2배)');if(s.drain)ex.push('준 피해의 절반 흡수');if(s.stun)ex.push(`상대 다음 턴 서브 행동 -${s.stun}`);if(s.seal)ex.push(s.t==='one'?'적중한 유닛 봉인':'상대 메인 유닛 봉인');if(s.swap)ex.push('상대 메인 유닛 적중 시 대기 필드로 밀어냄');if(s.self)ex.push(`자신도 ${s.self} 피해`);if(s.counter&&s.t!=='guard')ex.push(`이후 반격 태세(${s.counter})`);if(s.heal)ex.push(`자신 체력 +${s.heal}`);if(s.selfKill)ex.push('사용 후 자신 소멸');if(s.transform)ex.push('변신! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.swapIn==='rika_full')ex.push('서브 필드의 리카가 메인 필드로 나와 「리카 (완전 현현)」으로 각성, 유타는 서브 필드로 물러나 버프만 줌 (타격당 +3, 각성 리카는 +5, 받는 피해 -2)');if(s.swapIn==='toji')ex.push('서브 필드의 손자 몸에 후시구로 토우지가 강령되어 메인 필드에 등장, 오가미는 대기 필드로');if(s.jackpot)ex.push('대박! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.ignoreProt)ex.push('장막·간이영역 무시');
  return t+(ex.length?' · '+ex.join(', '):'');
 }
-function condText(id,U){const C=CARDS[id];U=U||C.ult;const sub=U.sub==='any'?'아무 서브 카드':U.sub.map(s=>`「${CARDS[s].sn}」`).join(' 또는 ');const mg=U.mg.map(m=>`「${CARDS[m].name}」`).join(' 또는 ');return `메인 필드에 ${C.sn} + 서브 필드에 ${sub} → 마법 ${mg} 발동`;}
+function ultNeedOk(m,U){if(U.need==='halfhp')return m.hp<=m.mhp/2;return true;}
+function condText(id,U){const C=CARDS[id];U=U||C.ult;const extra=U.need==='halfhp'?` (단, ${C.sn} 체력이 절반 이하일 때만)`:'';const sub=U.sub==='any'?'아무 서브 카드':U.sub.map(s=>`「${CARDS[s].sn}」`).join(' 또는 ');const mg=U.mg.map(m=>`「${CARDS[m].name}」`).join(' 또는 ');return `메인 필드에 ${C.sn} + 서브 필드에 ${sub} → 마법 ${mg} 발동${extra}`;}
 function catalystOf(mid){return ULT_UNITS.flatMap(u=>ultsOf(CARDS[u]).filter(x=>x.U.mg.includes(mid)).map(x=>({u,U:x.U})));}
 function subKeyOf(sid){return ULT_UNITS.flatMap(u=>ultsOf(CARDS[u]).filter(x=>Array.isArray(x.U.sub)&&x.U.sub.includes(sid)).map(x=>({u,U:x.U})));}
 
@@ -3289,6 +3307,14 @@ const ART={
  eso:()=>bg('#2f3a2a','sun','#b0d090')+drop(84,26,4,'#6a8a3a')+drop(14,40,3.5,'#6a8a3a')+bust({h:'messy',hair:'#3a3a2a',skin:'#8aa070',body:'#2a2f2a',x:P('M50 25v23Q41 40 39 36Q41 27 50 25Z','#4a5a3a')}),
  s_doll:()=>bg('#3a3040','sun')+doll(50,48,2.2),
  s_kogane:()=>bg('#3a3020','rays','#ffe080')+P('M36 32l-5 -14l11 9z',OCH)+P('M64 32l5 -14l-11 9z',OCH)+C(50,46,21,OCH)+P('M39 44h22v12h-22z',INK)+S('M42 50h16',PAP,1.2,'opacity=".7"')+C(44,37,1.8,INK)+C(56,37,1.8,INK),
+ miguel:()=>bg('#4a3a22','rays','#f0c060')+[0,1,2].map(i=>S(`M${4+i*6} 78Q${20+i*8} 40 ${8+i*10} 6`,INK,2.2)).join('')+bust({h:'messy',hair:INK,skin:'#8a5a3a',body:'#c08a2a',x:S('M38 62q12 6 24 0',INK,1.4)})+S('M70 78Q84 40 96 10',INK,2.4)+S('M76 78Q90 44 98 24',INK,1.8),
+ ogami:()=>bg('#3a2a40','dots','#d0b0e0')+bust({h:'bun',hair:'#b8b4ac',body:'#5a3a6a',x:S('M42 41q8 3 16 0',GRY,1)+S('M41 33q3 -1 6 0M53 33q3 -1 6 0',GRY,.8)})+S('M84 78V34',OCH,2.4)+C(84,32,3,OCH),
+ ogami_grandson:()=>bg('#2a2a33','sun','#a0a0c0')+bust({h:'short',hair:INK,body:'#3a3a44',eyes:false,x:S('M44.5 37.5h3M52.5 37.5h3',GRY,1.2)})+C(50,40,26,'none','stroke="#c49a3c" stroke-width="1" stroke-dasharray="2 3" opacity=".7"'),
+ haibara:()=>bg('#3a4a5a','rays','#ffe0a0')+bust({h:'spiky',hair:INK,body:UNI,eyes:false,x:S('M44 36q2 -2 4 0M52 36q2 -2 4 0',INK,1.3)+P('M44 41q6 6 12 0z',INK)}),
+ nitta:()=>bg('#3a4038','sun','#c0e0b0')+bust({h:'bob',hair:'#6a4a30',body:'#2a2a30',x:P('M46 52h8l-2 10h-4z',PAP)})+C(82,24,7,'none','stroke="#9dbb84" stroke-width="2"')+S('M82 19v10M77 24h10',PAP,1.6),
+ mimiko:()=>bg('#3a2a3a','dots','#ffd0f0')+P('M2 80Q4 60 28 56Q52 60 52 80Z',INK)+C(28,44,10,SKN)+P('M17 44Q15 30 28 29Q41 30 39 44Q36 36 28 36Q20 36 17 44Z',INK)+P('M48 80Q50 60 72 56Q96 60 98 80Z','#2a2a3a')+C(72,44,10,SKN)+P('M61 46Q59 30 72 29Q85 30 83 46L86 58Q80 50 80 42Q76 36 72 36Q66 36 64 42Q64 50 58 58Z','#e0c070')+S('M24 45h2M30 45h2M68 45h2M74 45h2',INK,1.2),
+ kechizu:()=>bg('#3a3020','sun','#e0a060')+P('M22 78Q18 50 30 38Q50 22 70 38Q82 50 78 78Z','#c07a3a')+C(40,46,4,INK)+C(60,46,4,INK)+P('M42 60q8 6 16 0q-8 3 -16 0z',INK)+drop(84,30,4,'#a05020')+drop(16,34,3,'#a05020'),
+ rika_full:()=>bg('#3a1018','rays','#ff6070')+C(50,40,36,'#b03a2e','opacity=".25"')+P('M4 80Q0 34 30 14Q50 2 70 14Q100 34 96 80Z','#d8d0c4')+P('M30 14L34 2L40 12L50 0L58 12L66 2L70 14Z',OCH)+C(34,32,6,INK)+C(66,32,6,INK)+C(34,32,2,RED)+C(66,32,2,RED)+P('M22 52Q50 40 78 52Q70 74 50 74Q30 74 22 52Z',INK)+S('M28 53v7M36 50v9M44 49v9M52 49v9M60 49v9M68 50v8M74 52v6',PAP,1.6)+C(86,70,4,'none','stroke="#c49a3c" stroke-width="2"'),
  mahoraga:()=>bg('#2a2620','rays','#e8d080')+wheel(50,11,10)+P('M12 80Q15 50 50 44Q85 50 88 80Z','#e6dfd0')+S('M34 58q16 8 32 0M38 66q12 6 24 0',GRY,1.2)+P('M45 40h10v8h-10z','#d8d0c0')+P('M38 32Q38 20 50 20Q62 20 62 32Q60 42 50 42Q40 42 38 32Z','#e6dfd0')+P('M39 28L24 20L36 33ZM61 28L76 20L64 33Z','#e6dfd0')+P('M41 28h18v4h-18z',INK)+S('M80 78L95 26',PAP,3.2)+P('M95 26l-1 -9l-3 8z',PAP)+P('M76 70l10 4',OCH),
  gyokken:()=>bg('#4a5060','dots')+P('M6 76L12 44L18 56L26 40L30 58Q40 64 38 74L26 78Q14 80 6 76Z',PAP)+C(22,58,1.8,INK)+P('M94 76L88 44L82 56L74 40L70 58Q60 64 62 74L74 78Q86 80 94 76Z','#1c1a18')+C(78,58,1.8,'#d8d0c0'),
  nue:()=>bg('#2a3550','rays','#a0c8ff')+P('M50 30Q34 12 6 22Q26 30 34 42Q50 36 66 42Q74 30 94 22Q66 12 50 30Z',PAP)+C(50,33,8,PAP)+C(46,32,2,INK)+C(54,32,2,INK)+P('M48 37l2 4l2 -4z',OCH)+bolt(52,46,1,'#f0d050'),
@@ -3348,7 +3374,8 @@ function detailHTML(id,inst){
   if(id==='mahoraga')body+=`<div class="dsk ult"><b>법륜 적응 (특수 능력)</b><p>같은 카드에게 공격받을 때마다 법륜이 돌아 적응합니다: 두 번째 공격부터 그 카드의 피해 절반, 세 번째부터 무효. 적응할 때마다 공격력 +1 (최대 +4).</p></div><div class="dsk ult"><b>소환 조건 (항상 장착 · 뽑기로는 나오지 않음)</b><p>① 메인 필드에 후시구로 메구미<br>② 내 서브·대기 필드에 십종영법 식신(옥견·누에·대사·만상·탈토) 3종 이상<br>③ 내 생명이 1개만 남았을 때<br>→ 메구미 메뉴의 「식신 강림」 (메인 행동 1, 대전당 1회). 메구미는 의식의 대가로 소멸합니다.</p></div>`;
   if(C.ult)body+=`<div class="dsk ult"><b>히든 궁극기${C.ult2?' ①':''} · ${esc(C.ult.n)}</b><p>${esc(skillDesc(C.ult))}</p><p class="cond">해방 조건: ${esc(condText(id))}</p><p class="cond" style="opacity:.7">해방 후 1회 사용 가능 · 메인 필드에서 내려가면 다시 잠김</p></div>`;
   if(C.ult2)body+=`<div class="dsk ult"><b>히든 궁극기 ② · ${esc(C.ult2.n)}</b><p>${esc(skillDesc(C.ult2))}</p><p class="cond">해방 조건: ${esc(condText(id,C.ult2))}</p><p class="cond" style="opacity:.7">①과 따로 해방 · 1회 사용 후 다시 잠김</p></div>`;
-  else if(id!=='mahoraga')body+=`<div class="dsk dim"><b>궁극기 없음</b><p>기본 공격에 특화된 유닛입니다.</p></div>`;
+  if(id==='rika_full')body+=`<div class="dsk ult"><b>각성 카드 (덱에 넣을 수 없음)</b><p>옷코츠 유타의 궁극기 ② 「리카 완전 현현」으로만 등장합니다. 서브 필드의 리카가 메인 필드로 나와 각성하고, 유타는 서브 필드에서 버프(타격당 +3, 각성 리카는 +5, 받는 피해 -2)를 줍니다.</p></div>`;
+  else if(!C.special)body+=`<div class="dsk dim"><b>궁극기 없음</b><p>기본 공격에 특화된 유닛입니다.</p></div>`;
   body+=synDetail(id,inst);
   if(inst){const st=[];if(inst.ul)st.push(C.ult2?'궁극기 ① 해방됨':'궁극기 해방됨');if(inst.ul2)st.push('궁극기 ② 해방됨');if(inst.sl)st.push('봉인됨 (이번 턴 공격 불가)');if(inst.ct)st.push(`반격 태세 (${inst.ct})`);if(inst.b)st.push(`공격력 영구 +${inst.b}`);if(st.length)body+=`<div class="dstat">${st.join(' · ')}</div>`;}
  }else if(C.type==='sub'){
@@ -3428,7 +3455,7 @@ function renderDeck(){
  const us=[...DB.sel].filter(id=>CARDS[id].ult);
  {const ss=SYN.filter(s=>s.m.filter(id=>DB.sel.has(id)).length>=2);$('#dbSyn').innerHTML=ss.length?ss.map(s=>`<div class="combo"><b>${esc(s.n)}</b> · ${s.m.filter(id=>DB.sel.has(id)).map(id=>esc(CARDS[id].sn)).join('·')}<br><span class="ok">${esc(synEff(s))}</span></div>`).join(''):'<div class="combo" style="color:var(--mut)">같은 시너지의 카드를 2장 이상 넣으면 여기에 표시됩니다.</div>';}
  $('#dbCombos').innerHTML=us.length?us.flatMap(id=>ultsOf(CARDS[id]).map(x=>[id,x.U])).map(([id,U])=>{const subOk=U.sub==='any'?tc.sub>0:U.sub.some(s=>DB.sel.has(s));const mgOk=U.mg.some(m=>DB.sel.has(m));
-  return `<div class="combo"><b>${esc(CARDS[id].sn)}</b> 「${esc(U.n)}」<br><span class="${subOk?'ok':'no'}">서브: ${U.sub==='any'?'아무 서브':U.sub.map(s=>CARDS[s].sn).join('/')}${subOk?'':' (덱에 없음)'}</span> · <span class="${mgOk?'ok':'no'}">마법: ${U.mg.map(m=>CARDS[m].sn).join('/')}${mgOk?'':' (덱에 없음)'}</span></div>`}).join(''):'<div class="combo" style="color:var(--mut)">궁극기를 가진 유닛(極 표시)을 넣어보세요.</div>';
+  return `<div class="combo"><b>${esc(CARDS[id].sn)}</b> 「${esc(U.n)}」<br><span class="${subOk?'ok':'no'}">서브: ${U.sub==='any'?'아무 서브':U.sub.map(s=>CARDS[s].sn).join('/')}${subOk?'':' (덱에 없음)'}</span> · <span class="${mgOk?'ok':'no'}">마법: ${U.mg.map(m=>CARDS[m].sn).join('/')}${mgOk?'':' (덱에 없음)'}</span>${U.need==='halfhp'?' · <span class="no">체력 절반 이하일 때만</span>':''}</div>`}).join(''):'<div class="combo" style="color:var(--mut)">궁극기를 가진 유닛(極 표시)을 넣어보세요.</div>';
 }
 $('#dbGrid').onclick=e=>{const it=e.target.closest('.dbitem');if(!it)return;const id=it.dataset.id;if(CARDS[id].special){toast('마허라는 항상 장착되어 있습니다. 대전 중 조건을 맞추면 소환할 수 있습니다.');return;}if(DB.sel.has(id))DB.sel.delete(id);else DB.sel.add(id);SFX.play(DB.sel.has(id)?'place':'click');renderDeck();};
 $('#dbTabs').onclick=e=>{const t=e.target.closest('.tab');if(!t)return;DB.f=t.dataset.f;$$('#dbTabs .tab').forEach(x=>x.classList.toggle('on',x===t));renderDeck();};
@@ -3500,6 +3527,14 @@ function dmgPlayer(d,v){
  return v;
 }
 function hurtCard(s,c,v,why){const P=G.p[s];const r=refOf(P,c);if(!r)return 0;c.hp-=v;fx({k:'dmg',s,u:c.u,v});if(c.hp<=0){removeAt(P,r);fx({k:'destroy',s,u:c.u});log(`${G.names[s]}의 [${cn(c)}] 소멸!${why?' ('+why+')':''}`,s,'kill');}return v;}
+/* 리카 완전 현현 / 강령술: 서브 필드 카드가 각성·강령되어 메인 필드로, 사용자는 서브(toSub) 또는 대기 필드로 */
+function ultSwap(a,u,s){const A=G.p[a];if(!s.swapIn||A.main!==u||G.winner!=null)return;
+ const old=A.sub;const N=mk(s.swapIn);if(old)N.u=old.u; /* 같은 카드가 서브→메인으로 이동하는 연출 */
+ u.ul=0;u.ul2=0;u.ct=0;
+ if(s.toSub){A.sub=u;A.main=N;log(`[${CARDS[s.swapIn].sn}]이(가) 메인 필드로 나와 각성했다! [${cn(u)}]은(는) 서브 필드에서 주력을 공급한다.`,a,'ult');}
+ else{A.sub=null;A.main=N;const i=A.wait.indexOf(null);if(i>=0){A.wait[i]=u;log(`[${cn(u)}]은(는) 대기 필드로 물러났다.`,a);}else{fx({k:'destroy',s:a,u:u.u});log(`[${cn(u)}]은(는) 자리가 없어 물러났다.`,a);}
+  log(`[${CARDS[s.swapIn].sn}]이(가) 강령되어 메인 필드에 등장!`,a,'ult');}
+ fx({k:'txt',s:a,u:N.u,t:CARDS[s.swapIn].sn,c:'unlock'});fx({k:'sfx',n:'heavy'});}
 let MAHO_HIT=null;
 function mahoAdapt(){if(!MAHO_HIT)return;const {d,k}=MAHO_HIT;MAHO_HIT=null;const D=G.p[d];const c=[D.main,D.sub,...D.wait].find(x=>x&&x.id==='mahoraga');if(!c)return;
  c.ad=c.ad||{};const st=c.ad[k]||0;if(st>=2)return;c.ad[k]=st+1;if(c.b<4)c.b+=1;
@@ -3576,6 +3611,7 @@ function doAttack(a,k,tgt){
  if(s.seal&&s.t!=='one'&&D.main){D.main.sl=1;log(`[${cn(D.main)}] 봉인!`,a);}
  if(s.self&&A.main===u&&G.winner==null){log(`[${cn(u)}] 반동 피해 ${s.self}`,a);hurtCard(a,u,s.self,'반동');}
  mahoAdapt();
+ ultSwap(a,u,s);
  if(s.selfKill&&A.main===u){A.main=null;fx({k:'destroy',s:a,u:u.u});log(`[${cn(u)}] 환수호박의 대가로 육체가 붕괴하여 소멸…`,a,'kill');}
 }
 function magicReq(s,c){const C=CARDS[c.id],P=G.p[s],O=G.p[1-s];if(C.req==='main'&&!P.main)return '메인 필드에 유닛이 있어야 합니다';if(C.req==='opmain'&&!O.main)return '상대 메인 필드에 유닛이 없습니다';return '';}
@@ -3598,7 +3634,8 @@ function doCast(s,c){
  }
  if(m&&G.p[s].main===m){for(const x of ultsOf(CARDS[m.id])){const U=x.U;
   if(!m[x.f]&&U.mg.includes(c.id)){
-   const ok=P.sub&&(U.sub==='any'||U.sub.includes(P.sub.id));
+   const ok=P.sub&&(U.sub==='any'||U.sub.includes(P.sub.id));const needOk=ultNeedOk(m,U);
+   if(ok&&!needOk){log(`(「${U.n}」 조건 미충족: ${cn(m)} 체력이 절반 이하여야 합니다)`,s);continue;}
    if(ok){m[x.f]=1;fx({k:'unlock',s,u:m.u,n:U.n});log(`[${cn(m)}]의 히든 궁극기 「${U.n}」 해방!!`,s,'ult');}
    else log(`(「${U.n}」 조건 미충족: 서브 필드에 ${U.sub==='any'?'서브 카드':U.sub.map(x=>CARDS[x].sn).join('/')} 필요)`,s);
   }}}
@@ -3919,7 +3956,7 @@ function aiPick(s){
       const wi=P.wait.findIndex(okSub);if(wi>=0&&!P.sub)return['toSub',{w:wi}];
       const hs=H.findIndex(okSub);if(hs>=0&&free>=0)return['toWait',{h:hs}];
      }}}}
-  if(m){for(const x of ultsOf(CARDS[m.id]).slice(1)){const U=x.U;if(!m[x.f]&&P.sub&&U.sub.includes(P.sub.id)){const hi=H.findIndex(c=>U.mg.includes(c.id));if(hi>=0&&can('cast',{h:hi}))return['cast',{h:hi}];}}}
+  if(m){for(const x of ultsOf(CARDS[m.id]).slice(1)){const U=x.U;if(!m[x.f]&&P.sub&&U.sub.includes(P.sub.id)&&ultNeedOk(m,U)){const hi=H.findIndex(c=>U.mg.includes(c.id));if(hi>=0&&can('cast',{h:hi}))return['cast',{h:hi}];}}}
   if(m&&CARDS[m.id].ult&&!m.ul&&canDraw(P)&&!H.some(c=>CARDS[m.id].ult.mg.includes(c.id))&&P.sub&&H.length<8)return['draw'];
   if(!m){
    let best=-1,bv=-1;P.wait.forEach((c,i)=>{if(c&&typ(c)==='unit'){const v=c.hp+CARDS[c.id].tier*4;if(v>bv){bv=v;best=i}}});if(best>=0)return['toMain',{w:best}];
@@ -4049,7 +4086,7 @@ const TUT=[
 <div class="warn">해방된 유닛을 메인 필드에서 내리면 해방 상태가 사라집니다. 순서가 중요합니다 — 반드시 유닛과 서브 카드를 먼저 배치한 후 마법을 사용하세요!</div>
 <h4>궁극기 조합표</h4>
 <table><tr><th>유닛</th><th>궁극기</th><th>서브 필드</th><th>촉매 마법</th></tr>
-${ULT_UNITS.flatMap(id=>ultsOf(CARDS[id]).map(x=>[id,x.U])).map(([id,U])=>{return `<tr><td>${esc(CARDS[id].sn)}</td><td>${esc(U.n)}<br><small style="color:var(--mut)">${esc(skillDesc(U))}</small></td><td>${U.sub==='any'?'아무 서브 카드':U.sub.map(s=>esc(CARDS[s].sn)).join(' 또는 ')}</td><td>${U.mg.map(m=>esc(CARDS[m].name)).join(' 또는 ')}</td></tr>`}).join('')}</table>`],
+${ULT_UNITS.flatMap(id=>ultsOf(CARDS[id]).map(x=>[id,x.U])).map(([id,U])=>{return `<tr><td>${esc(CARDS[id].sn)}</td><td>${esc(U.n)}<br><small style="color:var(--mut)">${esc(skillDesc(U))}</small></td><td>${U.sub==='any'?'아무 서브 카드':U.sub.map(s=>esc(CARDS[s].sn)).join(' 또는 ')}</td><td>${U.mg.map(m=>esc(CARDS[m].name)).join(' 또는 ')}${U.need==='halfhp'?'<br><small style="color:var(--red2)">+ 유닛 체력이 절반 이하일 때만</small>':''}</td></tr>`}).join('')}</table>`],
 ['시너지',()=>`<h3>시너지</h3>
 <p><b>메인 필드의 유닛</b>과 짝이 맞는 카드가 <b>내 서브 필드나 대기 필드</b>에 함께 있으면 시너지가 발동해 메인 유닛이 강해집니다.</p>
 <ul><li>발동 중이면 메인 유닛 카드에 <b>「시너지」</b> 표시가 붙고, 왼쪽 플레이어 정보와 전투 로그에 시너지 이름이 나옵니다.</li>
