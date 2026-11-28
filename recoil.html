@@ -3334,6 +3334,7 @@ function computeSkeleton(f) {
   else o = idle;
   if (f.def.offhand) f.def.offhand(f, J, o);
   J.wAng = o.wAng; J.wAngB = o.wAngB; J.slide = o.slide || 0; J.smear = o.smear || null; J.spin = o.spin;
+  J.sheathed = !!o.sheathed; J.sliding = !!o.sliding; J.drawing = !!o.drawing;
   const arm = (sh, target) => { const r = ik2(sh, target, d.upper, d.fore, 1); return { el: r.joint, hand: r.end }; };
   const aF = arm(shF, o.hF), aB = arm(shB, o.hB);
   J.elF = aF.el; J.hF = aF.hand; J.elB = aB.el; J.hB = aB.hand;
@@ -3800,16 +3801,29 @@ const KAI_MATS = buildMats({
   steel: ['#ffffff', '#dde3ee', '#9aa2b8', '#2a2e3e'],
   tsuka: ['#5a4a3a', '#2e2620', '#1c1612', '#060404'],
   tsuba: ['#e8c070', '#b08840', '#7a5a28', '#2a1a08'],
+  saya:  ['#5a3a30', '#3a2420', '#26160f', '#0a0604'],
   smear: ['#ffffff', '#f0f4ff', '#c8d2ea', '#6a7898']
 });
 // 일본도: 손잡이(검은 끈) · 동그란 코등이 · 살짝 휜 긴 칼날
-function drawKatana(R, hand, ang, gp) {
+function drawKatana(R, hand, ang, gp, len = 18.2) {
   const dv = dirOf(ang), pv = V(-dv.y, dv.x);
   R.cap(vadd(hand, dv, -4.0), vadd(hand, dv, 0.6), 0.5, 0.5, 'tsuka', gp, false);
   R.ell(vadd(hand, dv, 0.9), 0.5, 1.15, ang, 'tsuba', gp, false);
-  const mid = vadd(vadd(hand, dv, 9.6), pv, -0.5), tip = vadd(vadd(hand, dv, 18.2), pv, -1.6);
+  if (len < 2) return;
+  if (len < 17) { R.cap(vadd(hand, dv, 1.2), vadd(hand, dv, len), 0.5, 0.45, 'steel', gp, false); return; }   // 칼집에 반쯤 들어간 상태
+  const mid = vadd(vadd(hand, dv, len * 0.53), pv, -0.5), tip = vadd(vadd(hand, dv, len), pv, -1.6);
   R.cap(vadd(hand, dv, 1.2), mid, 0.5, 0.42, 'steel', gp, false);
   R.cap(mid, tip, 0.42, 0.1, 'steel', gp, false);
+}
+// 칼집: 허리 앞쪽(입구)에서 뒤·아래로 비스듬히
+function kaiSaya(J) {
+  const v = vadd(V(-J.n.x * 0.86, -J.n.y * 0.86), J.u, -0.52), L = Math.hypot(v.x, v.y), sd = V(v.x / L, v.y / L);
+  return { M: vadd(vadd(J.hip, J.n, 1.5), J.u, 1.4), sd, ang: Math.atan2(sd.y, sd.x) };
+}
+// 칼을 꽂아둔 자세: 오른손은 칼자루에, 왼손은 칼집 입구를 쥠
+function sheathedArms(J) {
+  const s = kaiSaya(J);
+  return { hF: vadd(s.M, s.sd, -2.6), wAng: s.ang + PI, hB: vadd(s.M, s.sd, 1.4), wAngB: 0, sheathed: true };
 }
 // ---------------------------------------------------------------------
 // 공용 인체 베이스 — 앞으로 추가할 캐릭터들의 기본 체형 (RAZE·ORIN과 같은 크기)
@@ -3838,6 +3852,7 @@ function drawHumanBase(R, f, J, o) {
   const waist = vadd(hip, u, 3.2);
   R.poly([vadd(hip, n, -1.9), vadd(vadd(waist, n, -1.55), u, 0), vadd(vadd(neck, n, -2.2), u, -1.2), vadd(vadd(neck, n, -1.3), u, 0.3),
           vadd(vadd(neck, n, 1.1), u, 0.35), vadd(vadd(neck, n, 2.1), u, -1.3), vadd(waist, n, 1.5), vadd(vadd(hip, n, 1.8), u, 0.2)], o.top, G.body, true);
+  if (o.belted) o.belted(R, J, G.belt);
   if (o.belt) R.poly([vadd(vadd(hip, u, 0.4), n, -1.95), vadd(vadd(hip, u, 0.4), n, 1.85), vadd(vadd(hip, u, 1.3), n, 1.75), vadd(vadd(hip, u, 1.3), n, -1.85)], o.belt, G.belt, false);
   // 앞다리
   R.cap(J.hipF, J.knF, 1.5, 1.14, o.bottom, G.lF, true);
@@ -3874,11 +3889,34 @@ const KAI_LOOK = {
     R.cap(vadd(vadd(head, hu, 1.9), hn, -1.7), vadd(vadd(head, hu, 0.4), hn, -2.4), 0.8, 0.5, 'hair', gp, false);
     R.dline(vadd(vadd(head, hu, 0.95), hn, 1.1), vadd(vadd(head, hu, 0.85), hn, 2.2), '#4a3020');   // 눈썹
   },
-  weapon(R, J, gp) { drawKatana(R, J.hF, J.wAng, gp); }
+  // 칼집 (허리)
+  belted(R, J, gp) {
+    const s = kaiSaya(J), pv = V(-s.sd.y, s.sd.x);
+    R.cap(s.M, vadd(vadd(s.M, s.sd, 16.5), pv, -0.7), 0.6, 0.48, 'saya', gp, false);
+    if (J.sheathed || (!J.sliding && !J.drawing && !J.swordOut)) {          // 칼이 꽂혀 있으면 칼자루만 앞으로 나옴
+      R.ell(vadd(s.M, s.sd, -0.3), 0.5, 1.1, s.ang, 'tsuba', gp, false);
+      R.cap(vadd(s.M, s.sd, -0.7), vadd(s.M, s.sd, -4.6), 0.5, 0.5, 'tsuka', gp, false);
+    }
+  },
+  weapon(R, J, gp) {
+    if (J.sliding || J.drawing) {                                       // 칼집 입구까지 보이는 칼날만 그림
+      const s = kaiSaya(J), d = V(s.M.x - J.hF.x, s.M.y - J.hF.y), len = Math.min(18.2, Math.hypot(d.x, d.y));
+      drawKatana(R, J.hF, Math.atan2(d.y, d.x), gp, len);
+    } else if (J.swordOut) drawKatana(R, J.hF, J.wAng, gp);
+  }
 };
-function drawKai(R, f, J) { drawHumanBase(R, f, J, KAI_LOOK); }
+function drawKai(R, f, J) {
+  J.swordOut = !J.sheathed && !J.sliding && !J.drawing && ((f.drawnT || 0) > 0 || (f.state === 'attack' && f.move && f.move.sword) || f.isGuarding());
+  drawHumanBase(R, f, J, KAI_LOOK);
+}
 // 중단 자세: 두 손으로 칼자루를 잡고 칼끝을 상대 쪽으로
 function kaiIdleArms(f, J, a) {
+  const dt = f.drawnT || 0;
+  if (dt === 0) return sheathedArms(J);                          // 평소: 칼집에
+  if (dt <= 12) {                                                // 다시 꽂는 중: 칼끝부터 칼집으로 미끄러져 들어감
+    const s = kaiSaya(J);
+    return { hF: vadd(s.M, s.sd, -(2.6 + 15.4 * dt / 12)), wAng: s.ang, hB: vadd(s.M, s.sd, 1.4), wAngB: 0, sliding: true };
+  }
   const S = J.shF, br = Math.sin(f.animT * 0.1) * 0.3;
   if (a === 'run' || a === 'dash') return { hF: vadd(S, V(-1.2, 6.0)), wAng: PI - 0.45 };          // 달릴 땐 칼을 뒤로 눕혀 듦
   if (a === 'jump' || a === 'fall') return { hF: vadd(S, V(3.0, 1.0)), wAng: -0.9 };
@@ -3891,7 +3929,7 @@ function kaiGuardArms(f, J, ga) {
   return { hF: vadd(S, gd, 5.6), wAng: ga - 1.45 };
 }
 // 왼손은 항상 칼자루 뒤쪽을 함께 잡음 (양손 파지)
-function kaiOffhand(f, J, o) { const dv = dirOf(o.wAng || 0); o.hB = vadd(o.hF, dv, -2.4); o.wAngB = o.wAng; }
+function kaiOffhand(f, J, o) { if (o.sheathed || o.sliding || o.drawing) return; const dv = dirOf(o.wAng || 0); o.hB = vadd(o.hF, dv, -2.4); o.wAngB = o.wAng; }
 
 // 발차기: 다리를 조준 방향으로 뻗음 (몸 자세) + 다리를 따라 판정
 function kickBody(opt = {}) {
@@ -3933,6 +3971,10 @@ function kneeBoxes(f, J, k) {
 function slashArms(f, J, idle, reach, k, ph) {
   const m = f.move, sh = m.shape, a = f.moveAim, S = J.shF, A0 = a + sh.from, A1 = a + sh.to, sg = Math.sign(sh.to - sh.from);
   const at = (ang, r) => vadd(S, dirOf(ang), r);
+  if (ph === 's' && f.iai) {                                      // 칼집에서 뽑으며 베기 (발도): 손을 앞위로 당기면 칼날이 칼집에서 빠져나옴
+    const sy = kaiSaya(J), p = (k + 1) / m.startup;
+    return { hF: vadd(sy.M, sy.sd, -(2.6 + 15.4 * p)), wAng: sy.ang, hB: vadd(sy.M, sy.sd, 1.4), wAngB: 0, attacking: true, drawing: true };
+  }
   if (ph === 's') { const p = (k + 1) / m.startup, back = A0 - sg * 0.7 * p; return { hF: at(back, reach * 0.62), wAng: back - sg * 0.9 * p, attacking: true }; }
   if (ph === 'a') {
     const p = (k - m.startup + 1) / m.active, pp = (k - m.startup) / m.active, cur = A0 + (A1 - A0) * p, prev = A0 + (A1 - A0) * pp;
@@ -3941,7 +3983,8 @@ function slashArms(f, J, idle, reach, k, ph) {
   const rp = Math.min(1, (k - m.startup - m.active) / Math.max(1, m.recovery + f.recExtra)), e = ease(rp), over = A1 + sg * 0.55 * (1 - rp);
   return { hF: vlerp(at(over, reach * 0.85), idle.hF, e), wAng: lerp(over + sg * 0.35, idle.wAng, e), attacking: true };
 }
-const kickArms = (f, J) => ({ hF: vadd(J.shF, V(2.8, 3.0)), wAng: -1.05, attacking: true });   // 발차기 중엔 칼을 세워 듦
+const kickArms = (f, J) => (f.drawnT || 0) > 12 ? { hF: vadd(J.shF, V(2.8, 3.0)), wAng: -1.05, attacking: true }   // 칼을 뽑은 상태면 세워 들고
+  : Object.assign(kaiIdleArms(f, J, 'idle'), { attacking: true });                                                   // 꽂혀 있으면 칼집에 손을 둔 채 발차기
 
 // 다음 평타 고르기: 조준 위 → 올려치기 / 아래 → 낮은 발차기·쓸기 / 정면 → 잽→스트레이트→훅→돌려차기 순서
 //   한 연속 공격에서 같은 기술은 한 번만 → 클릭할 때마다 다른 평타
@@ -3968,19 +4011,19 @@ function kaiStart(f, inp) {
   return 'N1';
 }
 const KAI_MOVES = {
-  N1: { name: 'QUICK CUT', arms: slashArms, normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.3, whiffExtra: 6, lean: 0.3,
+  N1: { name: 'QUICK CUT', arms: slashArms, sword: true, normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.3, whiffExtra: 6, lean: 0.3,
     shape: { type: 'arc', from: -1.25, to: 0.85, r0: 8, r1: 25, size: 3 },      // 짧게 휘둘러 베기
     hit: { dmg: 20, hitstun: 15, blockstun: 9, kb: 1.0, hitstop: 4, guardDmg: 8, blockPush: 1.4 }, onFrame: stepForward(0.7) },
-  N2: { name: 'KESA CUT', arms: slashArms, normal: true, startup: 5, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.5, whiffExtra: 7, lean: 0.35,
+  N2: { name: 'KESA CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 10, chain: kaiNext, whiffRecoil: 1.5, whiffExtra: 7, lean: 0.35,
     shape: { type: 'arc', from: -1.7, to: 1.05, r0: 8, r1: 26, size: 3.5 },     // 머리 위에서 비스듬히 크게 내려 베기
     hit: { dmg: 26, hitstun: 16, blockstun: 10, kb: 1.3, hitstop: 5, guardDmg: 10, blockPush: 1.6 }, onFrame: stepForward(1.0) },
-  N3: { name: 'GYAKU CUT', arms: slashArms, normal: true, startup: 5, active: 3, recovery: 11, chain: kaiNext, whiffRecoil: 1.6, whiffExtra: 8, lean: 0.3,
+  N3: { name: 'GYAKU CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 11, chain: kaiNext, whiffRecoil: 1.6, whiffExtra: 8, lean: 0.3,
     shape: { type: 'arc', from: 1.15, to: -1.3, r0: 8, r1: 26, size: 3.5 },      // 아래에서 거슬러 크게 올려 베기
     hit: { dmg: 30, hitstun: 18, blockstun: 11, kb: 1.2, kbY: -0.8, hitstop: 5, guardDmg: 12, blockPush: 1.8 }, onFrame: stepForward(0.8) },
   N4: { name: 'ROUNDHOUSE', normal: true, startup: 7, active: 4, recovery: 15, chain: kaiNext, whiffRecoil: 2.0, whiffExtra: 10, aimClamp: [-0.7, 0.3],
     body: kickBody({ lean: -0.4 }), boxesAt: legBoxes, arms: kickArms,
     hit: { dmg: 40, hitstun: 26, blockstun: 13, kb: 3.0, kbY: -1.4, knockdown: true, hitstop: 8, shake: 2, guardDmg: 18, blockPush: 2.6 }, onFrame: stepForward(0.5) },
-  UP: { name: 'RISING CUT', arms: slashArms, normal: true, startup: 5, active: 3, recovery: 13, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 9, aimClamp: [-1.0, -0.45], lean: 0.1,
+  UP: { name: 'RISING CUT', arms: slashArms, sword: true, normal: true, startup: 5, active: 3, recovery: 13, chain: kaiNext, whiffRecoil: 1.4, whiffExtra: 9, aimClamp: [-1.0, -0.45], lean: 0.1,
     shape: { type: 'arc', from: 1.25, to: -0.9, r0: 7, r1: 25, size: 4 },     // 앞 아래에서 위로 베어 올림
     hit: { dmg: 34, hitstun: 26, blockstun: 12, kb: 0.6, kbY: -4.8, hitstop: 7, shake: 1, guardDmg: 14, blockPush: 1.6 },   // 띄우기 → 점프 캔슬로 공중 콤보
     onFrame: stepForward(0.9) },
@@ -3999,7 +4042,7 @@ const KAI_MOVES = {
       return false;
     } },
   // ---- 공중 ----
-  aN1: { name: 'AIR CUT', arms: slashArms, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 9, whiffRecoil: 0.4, whiffExtra: 5,
+  aN1: { name: 'AIR CUT', arms: slashArms, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 9, whiffRecoil: 0.4, whiffExtra: 5,
     shape: { type: 'arc', from: -1.4, to: 1.0, r0: 8, r1: 24, size: 3.5 },
     hit: { dmg: 22, hitstun: 22, blockstun: 10, kb: 0.8, kbY: -1.8, hitstop: 4, guardDmg: 9, blockPush: 1.3 } },
   aN2: { name: 'AIR KNEE', normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 4, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
@@ -4008,7 +4051,7 @@ const KAI_MOVES = {
   aN3: { name: 'AXE KICK', normal: true, air: true, landCancel: true, startup: 6, active: 4, recovery: 13, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.35, 1.3],
     body: kickBody({ lean: -0.2 }), boxesAt: legBoxes, arms: kickArms,
     hit: { dmg: 38, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 8, shake: 2, guardDmg: 16, blockPush: 2 } },
-  aUP: { name: 'AIR RISING', arms: slashArms, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+  aUP: { name: 'AIR RISING', arms: slashArms, sword: true, normal: true, air: true, landCancel: true, chain: kaiNext, startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
     aimClamp: [-1.0, -0.45], shape: { type: 'arc', from: 1.25, to: -0.9, r0: 7, r1: 24, size: 4 },
     hit: { dmg: 26, hitstun: 24, blockstun: 11, kb: 0.6, kbY: -3.6, hitstop: 5, guardDmg: 11, blockPush: 1.2 } },
   aST: { name: 'STOMP', normal: true, air: true, landCancel: true, startup: 5, active: 5, recovery: 14, whiffRecoil: 0.3, whiffExtra: 8, aimClamp: [1.05, 1.45],
@@ -4046,7 +4089,7 @@ const CHARS = {
     mats: KAI_MATS, fx: { col: PAL.orange },
     // 칼 가드: 보통 각도, 스킬이 없는 대신 가드 게이지가 조금 넉넉함
     guard: { name: 'BLADE GUARD', just: 9, gauge: 105, bsMul: 0.85, push: 1.0, jgStagger: 20, arc: 1.05, zone: false },
-    moves: KAI_MOVES, pickNormal: kaiStart, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
+    moves: KAI_MOVES, pickNormal: kaiStart, sheath: true, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
   }
 };
 const CHAR_LIST = ['RAZE', 'ORIN', 'KAI'];
@@ -4237,6 +4280,10 @@ class Fighter {
     this.integrate();
     if (this.onGround && (this.state === 'walk' || this.state === 'run')) this.stepPh += this.vx * this.facing / (this.state === 'run' ? 4.6 : 2.8);
     this.sway += (clamp(-this.vx * 0.9, -2.5, 2.5) - this.sway) * 0.15;
+    if (this.def.sheath) {                         // 칼을 쓰는 동안(베기·가드)은 뽑은 채, 안 쓰면 잠시 뒤 칼집에 꽂음
+      const use = (this.state === 'attack' && this.move && (this.move.sword || this.drawnT > 12)) || this.isGuarding();
+      if (use) this.drawnT = 50; else if (this.drawnT > 0) this.drawnT--;
+    }
   }
 
   toFree() {
@@ -4364,6 +4411,7 @@ class Fighter {
       this.kaiUsed.push(id);
     }
     this.chainNext = false;
+    this.iai = !!(this.def.sheath && m.sword && !this.drawnT);   // 칼집에서 바로 뽑아 베기
     if (m.skill) { this.cd[m.skill] = m.cd; SFX.play('skill', pitch); } else SFX.play('swing', pitch * (0.92 + Math.random() * 0.16));
     if (id === 'aN1' && !this.def.pickNormal) this.airAtk++;
     if (m.onStart) m.onStart(this);
