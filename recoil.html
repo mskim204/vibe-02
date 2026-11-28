@@ -4286,21 +4286,21 @@ const AURA_MOVES = {
 };
 
 // ---------------------------------------------------------------------
-// DRAKO — 인간형 드래곤 (딜러): 두 개의 뿔 · 날개 · 꼬리 · 비늘 · 손톱
+// DRAKO — 갈색 인간형 드래곤 (딜러): 두 개의 뿔 · 날개 · 꼬리 · 비늘 · 손톱
 //   옷 대신 살짝 긴 갈색 띠를 몸에 둘러 감음
 //   평타는 손톱 할퀴기, 스킬은 꼬리 휘두르기 / 짧은 화염 숨결 / 손톱 난무
 //   딜러: 공격력이 높은 대신 체력·가드가 약함 (근접전)
 // ---------------------------------------------------------------------
 const DRAKO_MATS = buildMats({
   skin:  ['#f6cfae', '#e0a27c', '#b87050', '#4a2418'],
-  scale: ['#ff9478', '#d0443a', '#8a2230', '#2a0810'],
-  wing:  ['#e86a6a', '#a8303c', '#6e1a2a', '#22060c'],
-  band:  ['#d2a272', '#a4703f', '#734a26', '#26160a'],
+  scale: ['#c89464', '#8e5a32', '#5e3a1e', '#1e1008'],     // 갈색 드래곤 비늘
+  wing:  ['#a87850', '#74482a', '#4c2e18', '#180c04'],
+  band:  ['#e6c49a', '#c09a6a', '#8a6a44', '#2a1e10'],     // 몸에 두른 띠 (비늘보다 밝은 갈색)
   horn:  ['#fff6e0', '#e2d0a6', '#a8926a', '#3a2c16'],
-  hair:  ['#a83a3a', '#6e1e26', '#481218', '#16040a'],
+  hair:  ['#7a5434', '#4e321c', '#321e10', '#100804'],
   claw:  ['#ffffff', '#f4ecd8', '#c8b894', '#4a3a24'],
   fire:  ['#fffbd0', '#ffd23d', '#ff8a3d', '#c03a1c'],
-  smear: ['#ffffff', '#ffe2d6', '#ff9a7a', '#d03a3a']
+  smear: ['#ffffff', '#fff0dc', '#e0b888', '#8e5a32']
 });
 // 꼬리: 엉덩이 뒤에서 아래·뒤로 늘어져 흔들림 (꼬리 휘두르기 중엔 앞으로 크게 휩쓺)
 function drawDrakoTail(R, f, J) {
@@ -4317,7 +4317,7 @@ function drawDrakoTail(R, f, J) {
     let q = vadd(p, dirOf(a), 2.1);
     if (q.y > -0.4) q = V(q.x, -0.4);                              // 바닥 아래로 내려가지 않게
     R.cap(p, q, w, w - 0.14, 'scale', 1, false);
-    if (i % 2 === 0) R.dot(vadd(p, V(0, -w + 0.2)), '#ff9478');    // 등줄기 비늘
+    if (i % 2 === 0) R.dot(vadd(p, V(0, -w + 0.2)), '#c89464');    // 등줄기 비늘
     p = q; w -= 0.14;
   }
   R.poly([vadd(p, V(-1.2, -0.8)), vadd(p, V(1.8, 0.2)), vadd(p, V(-0.6, 1.4))], 'scale', 1, false);   // 꼬리 끝
@@ -4399,7 +4399,7 @@ const DRAKO_LOOK = {
       R.cap(m, tip, 0.5 * s, 0.12, 'horn', gp, false);
     }
     R.dot(vadd(vadd(head, hu, 0.2), hn, 1.75), '#ffd23d');           // 금빛 눈
-    R.dot(vadd(vadd(head, hu, -0.7), hn, -0.2), '#d0443a'); R.dot(vadd(vadd(head, hu, -1.1), hn, -0.6), '#d0443a');   // 뺨의 비늘
+    R.dot(vadd(vadd(head, hu, -0.7), hn, -0.2), '#8e5a32'); R.dot(vadd(vadd(head, hu, -1.1), hn, -0.6), '#8e5a32');   // 뺨의 비늘
   },
   // 손톱: 손끝에서 뻗은 세 개의 하얀 발톱
   handDeco(R, el, hand, gp) {
@@ -4526,7 +4526,7 @@ const CHARS = {
     moves: AURA_MOVES, hover: true, draw: drawAura, idleArms: auraIdleArms, guardArms: auraGuardArms
   },
   DRAKO: {
-    id: 'DRAKO', name: 'DRAKO', title: 'CRIMSON CLAW', style: 'SAVAGE', role: 'DEALER', hp: 900, pitch: 0.85,
+    id: 'DRAKO', name: 'DRAKO', title: 'BRONZE CLAW', style: 'SAVAGE', role: 'DEALER', hp: 900, pitch: 0.85,
     walk: 1.5, run: 2.9, jumpV: -5.8, grav: 0.32, airAcc: 0.27, dashMul: 1.05,
     dim: { hipH: 11, thigh: 5.9, shin: 5.9, torso: 8, headR: 3.2, upper: 4.8, fore: 4.6, crouchH: 15, crouchTop: 16.2 },   // 베이스 체형
     mats: DRAKO_MATS, fx: { col: PAL.orange },
@@ -5520,7 +5520,7 @@ const SKILL_ICONS_AIR = {
 const CHAR_INFO = {
   RAZE: { ko: '근접 연타형', desc: '쌍단검과 돌진으로 몰아붙이는 그림자 결투가', stats: [['SPD', 5], ['RNG', 2], ['POW', 3], ['DEF', 2]] },
   ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] },
-  DRAKO: { ko: '드래곤 딜러', desc: '뿔과 날개, 꼬리를 가진 인간형 드래곤 · 손톱·꼬리·화염으로 몰아친다', stats: [['SPD', 4], ['RNG', 2], ['POW', 5], ['DEF', 1]] },
+  DRAKO: { ko: '드래곤 딜러', desc: '뿔과 날개, 꼬리를 가진 갈색 인간형 드래곤 · 손톱·꼬리·화염으로 몰아친다', stats: [['SPD', 4], ['RNG', 2], ['POW', 5], ['DEF', 1]] },
   AURA: { ko: '해파리 서포터', desc: '등 뒤의 큰 해파리가 전기로 공격 · 회복과 강화로 팀을 돕는다', stats: [['SPD', 3], ['RNG', 2], ['POW', 2], ['DEF', 2]] },
   KAI: { ko: '일본도 평타형', desc: '스킬 없이 평타만! 상황·조준·순서마다 다른 평타 13종', stats: [['SPD', 4], ['RNG', 3], ['POW', 3], ['DEF', 3]] }
 };
