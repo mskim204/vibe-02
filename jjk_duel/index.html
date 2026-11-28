@@ -3003,9 +3003,9 @@ const UNIT_DATA=[
 ['yuta','옷코츠 유타','특급 주술사',6,'愛',32,SK('주력 검격','one',8),SK('주언: 죽어라','all',5),UL('순애포 (리카 완전 현현)','all',10,['s_rika'],['m_rct','m_black'],{heal:12})],
 ['geto','게토 스구루','특급 주저사',6,'渦',30,SK('주령 사출','one',7),SK('주령 떼 해방','rand',3,{hits:5}),UL('극번 - 소용돌이','one',22,['fly','centi','grass'],['m_uzu','m_veil'],{pierce:1})],
 ['tsukumo','츠쿠모 유키','특급 주술사',6,'星',30,SK('봄바예: 질량 펀치','one',9),SK('가루다 차기','all',4),UL('블랙홀','all',14,['s_garuda'],['m_black','m_rct'],{self:8})],
-['sukuna','료멘 스쿠나','저주의 왕',6,'宿',38,SK('해(解)','one',9),SK('팔(八)','rand',4,{hits:4}),UL('영역 전개 - 복마어주자 (푸가)','all',12,['uraume'],['m_finger','m_veil'],{pierce:1,ignoreProt:1})],
+['sukuna','료멘 스쿠나','저주의 왕',6,'宿',38,SK('해(解)','one',9),SK('팔(八)','rand',4,{hits:4}),UL('영역 전개 - 복마어주자','all',12,['uraume'],['m_finger','m_veil'],{pierce:1,ignoreProt:1})],
 ['mahito','마히토','특급 주령',6,'魂',30,SK('무위전변: 변형 타격','one',8,{drain:1}),SK('다중혼 발산체','all',4),UL('영역 전개 - 자폐원돈과','soul',15,['kaizo'],['m_veil','m_uzu'])],
-['jogo','죠고','특급 주령',6,'炎',30,SK('화산 분출','one',8),SK('화력','all',5),UL('영역 전개 - 개관철위산 (극번: 운)','all',11,['kaizo','fly'],['m_veil','m_black'])],
+['jogo','죠고','특급 주령',6,'炎',30,SK('화산 분출','one',8),SK('화력','all',5),UL('영역 전개 - 개관철위산','all',11,['kaizo','fly'],['m_veil','m_black'])],
 ['hanami','하나미','특급 주령',6,'花',32,SK('나무뿌리 찌르기','one',7),SK('저주의 씨앗','all',3,{drain:1}),UL('영역 전개 - 타다익선','all',8,['grass','centi'],['m_simple','m_veil'],{heal:12})],
 ['dagon','다곤','특급 주령',6,'海',28,SK('수류탄','one',7),SK('사해','all',5),UL('영역 전개 - 탕온평선','rand',4,['fly','centi'],['m_simple','m_uzu'],{hits:8,pierce:1})],
 ['choso','쵸소우','특급 주물',6,'赤',28,SK('천혈','one',9,{pierce:1}),SK('초신성','all',5)],
@@ -3089,6 +3089,16 @@ const SHIKI=['gyokken','nue','daija','mansho','datto'];
 CARDS.mahoraga.special=true;
 const ALL_IDS=Object.keys(CARDS).filter(id=>!CARDS[id].special);
 const TYPE_NAME={unit:'유닛 카드',sub:'서브 카드',magic:'마법 카드'};
+/* 두 번째 궁극기 (애니메이션에서 궁극기급 기술이 두 개인 캐릭터). 열쇠 서브 카드는 같고 촉매 마법이 다름 */
+const ULT2={
+ gojo:UL('허식 「자(茈)」','one',26,['s_eyes'],['m_vow','m_black'],{pierce:1,ignoreProt:1}),
+ sukuna:UL('「개(開)」 푸가','one',28,['uraume'],['m_vow','m_black'],{pierce:1}),
+ geto:UL('백귀야행','rand',10,['fly','centi','grass'],['m_black','m_simple'],{hits:3,pierce:1}),
+ jogo:UL('극번 「운」','all',13,['kaizo','fly'],['m_uzu','m_simple'],{pierce:1}),
+ mahito:UL('편살즉영체','one',12,['kaizo'],['m_black','m_vow'],{transform:1}),
+};
+for(const id in ULT2)if(CARDS[id])CARDS[id].ult2=ULT2[id];
+const ultsOf=C=>[C.ult&&{k:'u',U:C.ult,f:'ul'},C.ult2&&{k:'u2',U:C.ult2,f:'ul2'}].filter(Boolean);
 const ULT_UNITS=ALL_IDS.filter(id=>CARDS[id].ult);
 /* =========================================================
    시너지: 메인 유닛 + 내 필드(서브·대기)에 있는 짝 카드
@@ -3140,12 +3150,12 @@ function skillDesc(s){
  else if(s.t==='rand')t=`${typ}에게 ${s.p} 피해 × ${s.hits}회`;
  else t=`${typ}에 ${s.p} 피해${s.hits?` × ${s.hits}회`:''}`;
  const ex=[];
- if(s.pierce)ex.push('방어 무시');if(s.crit)ex.push('40% 확률 치명타(2배)');if(s.drain)ex.push('준 피해의 절반 흡수');if(s.stun)ex.push(`상대 다음 턴 서브 행동 -${s.stun}`);if(s.seal)ex.push(s.t==='one'?'적중한 유닛 봉인':'상대 메인 유닛 봉인');if(s.swap)ex.push('상대 메인 유닛 적중 시 대기 필드로 밀어냄');if(s.self)ex.push(`자신도 ${s.self} 피해`);if(s.counter&&s.t!=='guard')ex.push(`이후 반격 태세(${s.counter})`);if(s.heal)ex.push(`자신 체력 +${s.heal}`);if(s.selfKill)ex.push('사용 후 자신 소멸');if(s.jackpot)ex.push('대박! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.ignoreProt)ex.push('장막·간이영역 무시');
+ if(s.pierce)ex.push('방어 무시');if(s.crit)ex.push('40% 확률 치명타(2배)');if(s.drain)ex.push('준 피해의 절반 흡수');if(s.stun)ex.push(`상대 다음 턴 서브 행동 -${s.stun}`);if(s.seal)ex.push(s.t==='one'?'적중한 유닛 봉인':'상대 메인 유닛 봉인');if(s.swap)ex.push('상대 메인 유닛 적중 시 대기 필드로 밀어냄');if(s.self)ex.push(`자신도 ${s.self} 피해`);if(s.counter&&s.t!=='guard')ex.push(`이후 반격 태세(${s.counter})`);if(s.heal)ex.push(`자신 체력 +${s.heal}`);if(s.selfKill)ex.push('사용 후 자신 소멸');if(s.transform)ex.push('변신! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.jackpot)ex.push('대박! 체력 완전 회복 + 공격력 영구 +4 후 공격');if(s.ignoreProt)ex.push('장막·간이영역 무시');
  return t+(ex.length?' · '+ex.join(', '):'');
 }
-function condText(id){const C=CARDS[id],U=C.ult;const sub=U.sub==='any'?'아무 서브 카드':U.sub.map(s=>`「${CARDS[s].sn}」`).join(' 또는 ');const mg=U.mg.map(m=>`「${CARDS[m].name}」`).join(' 또는 ');return `메인 필드에 ${C.sn} + 서브 필드에 ${sub} → 마법 ${mg} 발동`;}
-function catalystOf(mid){return ULT_UNITS.filter(u=>CARDS[u].ult.mg.includes(mid));}
-function subKeyOf(sid){return ULT_UNITS.filter(u=>Array.isArray(CARDS[u].ult.sub)&&CARDS[u].ult.sub.includes(sid));}
+function condText(id,U){const C=CARDS[id];U=U||C.ult;const sub=U.sub==='any'?'아무 서브 카드':U.sub.map(s=>`「${CARDS[s].sn}」`).join(' 또는 ');const mg=U.mg.map(m=>`「${CARDS[m].name}」`).join(' 또는 ');return `메인 필드에 ${C.sn} + 서브 필드에 ${sub} → 마법 ${mg} 발동`;}
+function catalystOf(mid){return ULT_UNITS.flatMap(u=>ultsOf(CARDS[u]).filter(x=>x.U.mg.includes(mid)).map(x=>({u,U:x.U})));}
+function subKeyOf(sid){return ULT_UNITS.flatMap(u=>ultsOf(CARDS[u]).filter(x=>Array.isArray(x.U.sub)&&x.U.sub.includes(sid)).map(x=>({u,U:x.U})));}
 
 /* =========================================================
    카드 렌더링
@@ -3312,7 +3322,7 @@ function cardHTML(c,o={}){
  const inst=typeof c==='object'?c:null;const id=inst?inst.id:c;const C=CARDS[id];
  const L=C.sn.length;const fs=L<=5?1:L<=7?.86:L<=9?.74:.64;
  let cls='card t-'+C.type+(o.cls?' '+o.cls:'');
- if(inst){if(inst.ul)cls+=' ult';if(inst.sl)cls+=' sealed';}
+ if(inst){if(inst.ul||inst.ul2)cls+=' ult';if(inst.sl)cls+=' sealed';}
  if(o.tgt)cls+=' tgt';
  const attrs=`data-cid="${id}"${inst?` data-uid="c${inst.u}"`:''}${o.z?` data-z="${o.z}"`:''}${o.i!=null?` data-i="${o.i}"`:''}${o.side?` data-side="${o.side}"`:''}${o.src?` data-src="${o.src}"`:''}`;
  let foot;
@@ -3320,7 +3330,7 @@ function cardHTML(c,o={}){
  else if(C.type==='sub')foot=`<div class="st lbl">서브</div><div class="st"><i>体</i>${inst?inst.hp:C.hp}</div>`;
  else foot=`<div class="st lbl">마법 · 일회성</div>`;
  let tags='';
- if(inst){if(inst.ul)tags+='<b class="tg ok">해방</b>';if(inst.sl)tags+='<b class="tg sl">봉인</b>';if(inst.ct)tags+='<b class="tg ct">반격</b>';if(o.syn)tags+='<b class="tg sy">시너지</b>';if(inst.b)tags+=`<b class="tg bf">+${inst.b}</b>`;}
+ if(inst){if(inst.ul||inst.ul2)tags+='<b class="tg ok">해방</b>';if(inst.sl)tags+='<b class="tg sl">봉인</b>';if(inst.ct)tags+='<b class="tg ct">반격</b>';if(o.syn)tags+='<b class="tg sy">시너지</b>';if(inst.b)tags+=`<b class="tg bf">+${inst.b}</b>`;}
  const hpPct=inst&&C.hp?Math.max(0,inst.hp/inst.mhp*100):0;
  return `<div class="${cls}" ${attrs} style="--fr:${frameColor(C)};${o.style||''}"><div class="cname" style="font-size:${fs}em">${esc(C.sn)}</div><div class="cgrade">${C.dual?'겸용 · ':''}${esc(C.gl)}</div>${C.ult?'<div class="ultmark">極</div>':''}<div class="art">${artHTML(id)}</div><div class="tags">${tags}</div><div class="cfoot">${foot}</div>${inst&&C.hp?`<div class="hpl"><i style="width:${hpPct}%"></i></div>`:''}</div>`;
 }
@@ -3334,20 +3344,21 @@ function detailHTML(id,inst){
   C.sk.forEach((s,i)=>body+=`<div class="dsk"><b>${i+1}번 공격 · ${esc(s.n)}</b> <span class="cost">메인 1</span><p>${esc(skillDesc(s))}</p></div>`);
   if(C.dual)body+=`<div class="dsk pas"><b>2번 · 패시브 「${esc(C.pas.n)}」</b> <span class="cost" style="color:#7fb0a8">서브 필드에서 발동</span><p>${esc(C.pas.d)}</p><p style="font-size:11px;color:#8f877a">겸용 카드: 메인 필드에서는 1번 공격, 서브 필드에서는 패시브로 메인 유닛을 강화합니다.</p></div>`;
   if(id==='mahoraga')body+=`<div class="dsk ult"><b>법륜 적응 (특수 능력)</b><p>같은 카드에게 공격받을 때마다 법륜이 돌아 적응합니다: 두 번째 공격부터 그 카드의 피해 절반, 세 번째부터 무효. 적응할 때마다 공격력 +1 (최대 +4).</p></div><div class="dsk ult"><b>소환 조건 (항상 장착 · 뽑기로는 나오지 않음)</b><p>① 메인 필드에 후시구로 메구미<br>② 내 서브·대기 필드에 십종영법 식신(옥견·누에·대사·만상·탈토) 3종 이상<br>③ 내 생명이 1개만 남았을 때<br>→ 메구미 메뉴의 「식신 강림」 (메인 행동 1, 대전당 1회). 메구미는 의식의 대가로 소멸합니다.</p></div>`;
-  if(C.ult)body+=`<div class="dsk ult"><b>히든 궁극기 · ${esc(C.ult.n)}</b><p>${esc(skillDesc(C.ult))}</p><p class="cond">해방 조건: ${esc(condText(id))}</p><p class="cond" style="opacity:.7">해방 후 1회 사용 가능 · 메인 필드에서 내려가면 다시 잠김</p></div>`;
+  if(C.ult)body+=`<div class="dsk ult"><b>히든 궁극기${C.ult2?' ①':''} · ${esc(C.ult.n)}</b><p>${esc(skillDesc(C.ult))}</p><p class="cond">해방 조건: ${esc(condText(id))}</p><p class="cond" style="opacity:.7">해방 후 1회 사용 가능 · 메인 필드에서 내려가면 다시 잠김</p></div>`;
+  if(C.ult2)body+=`<div class="dsk ult"><b>히든 궁극기 ② · ${esc(C.ult2.n)}</b><p>${esc(skillDesc(C.ult2))}</p><p class="cond">해방 조건: ${esc(condText(id,C.ult2))}</p><p class="cond" style="opacity:.7">①과 따로 해방 · 1회 사용 후 다시 잠김</p></div>`;
   else if(id!=='mahoraga')body+=`<div class="dsk dim"><b>궁극기 없음</b><p>기본 공격에 특화된 유닛입니다.</p></div>`;
   body+=synDetail(id,inst);
-  if(inst){const st=[];if(inst.ul)st.push('궁극기 해방됨');if(inst.sl)st.push('봉인됨 (이번 턴 공격 불가)');if(inst.ct)st.push(`반격 태세 (${inst.ct})`);if(inst.b)st.push(`공격력 영구 +${inst.b}`);if(st.length)body+=`<div class="dstat">${st.join(' · ')}</div>`;}
+  if(inst){const st=[];if(inst.ul)st.push(C.ult2?'궁극기 ① 해방됨':'궁극기 해방됨');if(inst.ul2)st.push('궁극기 ② 해방됨');if(inst.sl)st.push('봉인됨 (이번 턴 공격 불가)');if(inst.ct)st.push(`반격 태세 (${inst.ct})`);if(inst.b)st.push(`공격력 영구 +${inst.b}`);if(st.length)body+=`<div class="dstat">${st.join(' · ')}</div>`;}
  }else if(C.type==='sub'){
   body+=`<div class="dstats"><span>체력 ${inst?inst.hp+' / '+inst.mhp:C.hp}</span><span>서브 필드 전용</span></div>`;
   body+=`<div class="dsk"><b>특수 능력 (서브 필드 배치 시)</b><p>${esc(C.d)}</p></div>`;
   body+=synDetail(id,null);
-  const ks=subKeyOf(id);if(ks.length)body+=`<div class="dsk ult"><b>궁극기 열쇠</b><p>${ks.map(u=>esc(CARDS[u].sn+' 「'+CARDS[u].ult.n+'」')).join('<br>')}</p></div>`;
+  const ks=subKeyOf(id);if(ks.length)body+=`<div class="dsk ult"><b>궁극기 열쇠</b><p>${ks.map(x=>esc(CARDS[x.u].sn+' 「'+x.U.n+'」')).join('<br>')}</p></div>`;
   body+=`<div class="dsk dim"><p>상대의 공격 대상이 될 수 있으며, 체력이 0이 되면 게임에서 소멸합니다.</p></div>`;
  }else{
   body+=`<div class="dstats"><span>일회성</span><span>패에서 즉시 발동 · 서브 1</span></div>`;
   body+=`<div class="dsk"><b>효과</b><p>${esc(C.d)}</p></div>`;
-  const ks=catalystOf(id);if(ks.length)body+=`<div class="dsk ult"><b>궁극기 촉매</b><p>${ks.map(u=>esc(`${CARDS[u].sn} 「${CARDS[u].ult.n}」`)).join('<br>')}</p><p class="cond">해당 유닛이 메인 필드, 조건에 맞는 서브 카드가 서브 필드에 있을 때 발동하면 궁극기 해방</p></div>`;
+  const ks=catalystOf(id);if(ks.length)body+=`<div class="dsk ult"><b>궁극기 촉매</b><p>${ks.map(x=>esc(`${CARDS[x.u].sn} 「${x.U.n}」`)).join('<br>')}</p><p class="cond">해당 유닛이 메인 필드, 조건에 맞는 서브 카드가 서브 필드에 있을 때 발동하면 궁극기 해방</p></div>`;
  }
  return `<div class="dwrap"><div class="dcard">${cardHTML(id)}</div><div class="dinfo"><div class="dtitle">${esc(C.name)}</div><div class="dsub">${C.dual?'겸용 카드 (유닛·서브)':TYPE_NAME[C.type]} · ${esc(C.gl)}</div>${body}<div class="dhint">우클릭(휴대폰: 길게 누르기)으로 고정 · 바깥을 누르면 닫힘</div></div></div>`;
 }
@@ -3414,7 +3425,7 @@ function renderDeck(){
  $('#dbTypes').innerHTML=`<span><b>${tc.unit}</b>유닛</span><span><b>${tc.sub}</b>서브</span><span><b>${tc.magic}</b>마법</span>`;
  const us=[...DB.sel].filter(id=>CARDS[id].ult);
  {const ss=SYN.filter(s=>s.m.filter(id=>DB.sel.has(id)).length>=2);$('#dbSyn').innerHTML=ss.length?ss.map(s=>`<div class="combo"><b>${esc(s.n)}</b> · ${s.m.filter(id=>DB.sel.has(id)).map(id=>esc(CARDS[id].sn)).join('·')}<br><span class="ok">${esc(synEff(s))}</span></div>`).join(''):'<div class="combo" style="color:var(--mut)">같은 시너지의 카드를 2장 이상 넣으면 여기에 표시됩니다.</div>';}
- $('#dbCombos').innerHTML=us.length?us.map(id=>{const U=CARDS[id].ult;const subOk=U.sub==='any'?tc.sub>0:U.sub.some(s=>DB.sel.has(s));const mgOk=U.mg.some(m=>DB.sel.has(m));
+ $('#dbCombos').innerHTML=us.length?us.flatMap(id=>ultsOf(CARDS[id]).map(x=>[id,x.U])).map(([id,U])=>{const subOk=U.sub==='any'?tc.sub>0:U.sub.some(s=>DB.sel.has(s));const mgOk=U.mg.some(m=>DB.sel.has(m));
   return `<div class="combo"><b>${esc(CARDS[id].sn)}</b> 「${esc(U.n)}」<br><span class="${subOk?'ok':'no'}">서브: ${U.sub==='any'?'아무 서브':U.sub.map(s=>CARDS[s].sn).join('/')}${subOk?'':' (덱에 없음)'}</span> · <span class="${mgOk?'ok':'no'}">마법: ${U.mg.map(m=>CARDS[m].sn).join('/')}${mgOk?'':' (덱에 없음)'}</span></div>`}).join(''):'<div class="combo" style="color:var(--mut)">궁극기를 가진 유닛(極 표시)을 넣어보세요.</div>';
 }
 $('#dbGrid').onclick=e=>{const it=e.target.closest('.dbitem');if(!it)return;const id=it.dataset.id;if(CARDS[id].special){toast('마허라는 항상 장착되어 있습니다. 대전 중 조건을 맞추면 소환할 수 있습니다.');return;}if(DB.sel.has(id))DB.sel.delete(id);else DB.sel.add(id);SFX.play(DB.sel.has(id)?'place':'click');renderDeck();};
@@ -3515,18 +3526,19 @@ function randTargets(d,o,ult){const D=G.p[d];return areaRefs(d,'rand',ult).filte
 
 function doAttack(a,k,tgt){
  const A=G.p[a],d=1-a,D=G.p[d],u=A.main,C=CARDS[u.id];
- const s=k==='u'?C.ult:C.sk[k];const nm=G.names[a];
- if(k==='u'){fx({k:'cutin',id:u.id,n:s.n,s:a});u.ul=0;log(`${nm}의 [${cn(u)}] 궁극기 「${s.n}」 발동!!`,a,'ult');}
+ const isU=k==='u'||k==='u2';const s=k==='u'?C.ult:k==='u2'?C.ult2:C.sk[k];const nm=G.names[a];
+ if(isU){fx({k:'cutin',id:u.id,n:s.n,s:a});if(k==='u')u.ul=0;else u.ul2=0;log(`${nm}의 [${cn(u)}] 궁극기 「${s.n}」 발동!!`,a,'ult');}
  fx({k:'atk',s:a,u:u.u});
  {const sl=synList(A);if(sl.length&&s.t!=='guard'){const st=synTotals(A);const ids=new Set(sl.flatMap(x=>x.s.m));
   [A.sub,...A.wait].forEach(c=>{if(c&&c!==u&&ids.has(c.id))fx({k:'ally',s:a,u:c.u});});
   const parts=[];if(st.atk)parts.push(`타격당 피해 +${st.atk}`);if(st.red)parts.push(`받는 피해 -${st.red}`);
   log(`${sl.map(x=>'「'+x.s.n+'」').join(' ')} 시너지 협공! ${parts.join(', ')}`,a,'ult');}}
  const o={pierce:s.pierce||subFx(A).pierce,ignoreProt:s.ignoreProt};
+ if(s.transform){u.hp=u.mhp;u.b+=4;fx({k:'heal',s:a,u:u.u,v:u.mhp});fx({k:'txt',s:a,u:u.u,t:'편살즉영체',c:'unlock'});log(`[${cn(u)}] 편살즉영체! 체력 완전 회복 + 공격력 영구 +4`,a,'ult');}
  if(s.jackpot){u.hp=u.mhp;u.b+=4;fx({k:'txt',s:a,u:u.u,t:'JACKPOT!!',c:'unlock'});log(`대박! [${cn(u)}] 체력 완전 회복 + 공격력 영구 +4`,a,'ult');}
  const hits=s.hits||1;let total=0;
  if(s.t==='one'){
-  if(k!=='u')log(`${nm}의 [${cn(u)}] → ${refName(d,tgt)}: 「${s.n}」`,a);
+  if(!isU)log(`${nm}의 [${cn(u)}] → ${refName(d,tgt)}: 「${s.n}」`,a);
   for(let i=0;i<hits&&G.winner==null;i++){
    if(A.main!==u)break;
    if(tgt.z!=='player'&&!refCard(D,tgt))break;
@@ -3535,19 +3547,19 @@ function doAttack(a,k,tgt){
    total+=hit(a,d,tgt,v,o);
   }
   if(s.seal&&tgt.z!=='player'){const c=refCard(D,tgt);if(c&&CARDS[c.id].type==='unit'){c.sl=1;log(`[${cn(c)}] 봉인! 다음 턴 공격 불가`,a);fx({k:'txt',s:d,u:c.u,t:'봉인!',c:'block'});}}
-  if(s.swap&&tgt.z==='main'&&D.main){const i=D.wait.indexOf(null);if(i>=0){const c=D.main;D.main=null;c.ul=0;D.wait[i]=c;log(`불의유희! [${cn(c)}]이(가) 대기 필드로 밀려났다!`,a);fx({k:'sfx',n:'swing'});}}
+  if(s.swap&&tgt.z==='main'&&D.main){const i=D.wait.indexOf(null);if(i>=0){const c=D.main;D.main=null;c.ul=0;c.ul2=0;D.wait[i]=c;log(`불의유희! [${cn(c)}]이(가) 대기 필드로 밀려났다!`,a);fx({k:'sfx',n:'swing'});}}
  }else if(s.t==='guard'){
   u.ct=s.counter;log(`${nm}의 [${cn(u)}] 「${s.n}」: 반격 태세!`,a);fx({k:'txt',s:a,u:u.u,t:'반격 태세',c:'block'});fx({k:'sfx',n:'block'});
  }else if(s.t==='soul'){
   if(D.main){const c=D.main;log(`무위전변! [${cn(c)}]의 영혼이 변형되어 소멸!`,a,'kill');D.main=null;fx({k:'dmg',s:d,u:c.u,v:c.hp});fx({k:'destroy',s:d,u:c.u});}
   else total+=dmgPlayer(d,s.p+hitBonus(a,false));
  }else if(s.t==='rand'){
-  if(k!=='u')log(`${nm}의 [${cn(u)}] 「${s.n}」: 무작위 ${hits}회 공격!`,a);
-  for(let i=0;i<hits&&G.winner==null;i++){if(A.main!==u)break;const ts=randTargets(d,o,k==='u');if(!ts.length){if(i===0)log('…하지만 맞힐 대상이 없었다.',a);break;}const r=ts[rnd(ts.length)];total+=hit(a,d,r,s.p+hitBonus(a,true),{...o,aoe:true});}
+  if(!isU)log(`${nm}의 [${cn(u)}] 「${s.n}」: 무작위 ${hits}회 공격!`,a);
+  for(let i=0;i<hits&&G.winner==null;i++){if(A.main!==u)break;const ts=randTargets(d,o,isU);if(!ts.length){if(i===0)log('…하지만 맞힐 대상이 없었다.',a);break;}const r=ts[rnd(ts.length)];total+=hit(a,d,r,s.p+hitBonus(a,true),{...o,aoe:true});}
  }else{
   const lbl=s.t==='wait'?'상대 대기 필드':'상대 메인·서브 필드';
-  if(k!=='u')log(`${nm}의 [${cn(u)}] → ${lbl}: 「${s.n}」`,a);
-  const refs=areaRefs(d,s.t,k==='u');
+  if(!isU)log(`${nm}의 [${cn(u)}] → ${lbl}: 「${s.n}」`,a);
+  const refs=areaRefs(d,s.t,isU);
   if(!refs.length)log('…하지만 맞힐 대상이 없었다.',a);
   const per=s.p+hitBonus(a,true);
   const cards=refs.map(r=>r.z==='player'?'P':refCard(D,r));
@@ -3582,12 +3594,12 @@ function doCast(s,c){
   case 'm_rally':{let n=0;for(let i=0;i<2;i++){if(!P.deck.length){if(!refillPool(P).length)break;refillDeck(s);}P.hand.push(P.deck.pop());n++;}fx({k:'sfx',n:'draw'});log(`교류회 개막! ${nm}이(가) 카드 ${n}장을 뽑았다.`,s,'mg');break;}
   case 'm_rct':if(m)healCard(s,m,10);healPlayer(s,6);log(`반전술식! ${m?`[${cn(m)}] 체력 +10, `:''}본체 체력 +6`,s,'mg');break;
  }
- if(m&&G.p[s].main===m){const U=CARDS[m.id].ult;
-  if(U&&!m.ul&&U.mg.includes(c.id)){
+ if(m&&G.p[s].main===m){for(const x of ultsOf(CARDS[m.id])){const U=x.U;
+  if(!m[x.f]&&U.mg.includes(c.id)){
    const ok=P.sub&&(U.sub==='any'||U.sub.includes(P.sub.id));
-   if(ok){m.ul=1;fx({k:'unlock',s,u:m.u,n:U.n});log(`[${cn(m)}]의 히든 궁극기 「${U.n}」 해방!!`,s,'ult');}
-   else log(`(궁극기 조건 미충족: 서브 필드에 ${U.sub==='any'?'서브 카드':U.sub.map(x=>CARDS[x].sn).join('/')} 필요)`,s);
-  }}
+   if(ok){m[x.f]=1;fx({k:'unlock',s,u:m.u,n:U.n});log(`[${cn(m)}]의 히든 궁극기 「${U.n}」 해방!!`,s,'ult');}
+   else log(`(「${U.n}」 조건 미충족: 서브 필드에 ${U.sub==='any'?'서브 카드':U.sub.map(x=>CARDS[x].sn).join('/')} 필요)`,s);
+  }}}
 }
 function synCheck(){if(!G.syn)G.syn=[[],[]];for(let s=0;s<2;s++){const P=G.p[s];const now=synList(P).map(x=>x.s.n+(x.cnt>1?' ×'+x.cnt:''));const prev=G.syn[s]||[];
  now.filter(n=>!prev.includes(n)).forEach(n=>{log(`시너지 발동: 「${n}」`,s,'ult');if(P.main)fx({k:'txt',s,u:P.main.u,t:'시너지 '+n,c:'unlock'});});
@@ -3614,7 +3626,8 @@ function check(type,a={}){
    if(P.main.sl)return '봉인 상태라 이번 턴 공격할 수 없습니다';
    const C=CARDS[P.main.id];
    if(a.k==='u'){if(!C.ult)return '궁극기가 없는 유닛입니다';if(!P.main.ul)return '궁극기가 아직 해방되지 않았습니다';}
-   const sk=a.k==='u'?C.ult:C.sk[a.k];
+   if(a.k==='u2'){if(!C.ult2)return '두 번째 궁극기가 없는 유닛입니다';if(!P.main.ul2)return '두 번째 궁극기가 아직 해방되지 않았습니다';}
+   const sk=a.k==='u'?C.ult:a.k==='u2'?C.ult2:C.sk[a.k];
    if(a.tgt!==undefined&&sk.t==='one'&&!validTarget(1-s,a.tgt))return '공격할 수 없는 대상입니다';
    return '';}
   case 'summon':{
@@ -3639,9 +3652,9 @@ function act(type,a={}){
   case 'draw':{if(!P.deck.length)refillDeck(s);const c=P.deck.pop();P.hand.push(c);P.ap.s--;fx({k:'sfx',n:'draw'});log(`${nm}: 덱에서 카드를 1장 뽑았다.`,s);break;}
   case 'toWait':{const c=P.hand.splice(a.h,1)[0];const i=P.wait.indexOf(null);P.wait[i]=c;P.ap.s--;fx({k:'sfx',n:'place'});log(`${nm}: [${cn(c)}]을(를) 대기 필드에 냈다.`,s);break;}
   case 'toHand':{const c=P.wait[a.w];P.wait[a.w]=null;P.hand.push(c);P.ap.s--;fx({k:'sfx',n:'draw'});log(`${nm}: 대기 필드의 [${cn(c)}]을(를) 패로 되돌렸다.`,s);break;}
-  case 'toMain':{const c=P.wait[a.w];P.wait[a.w]=null;c.ul=0;P.main=c;P.ap.s--;fx({k:'sfx',n:'place'});fx({k:'txt',s,u:c.u,t:'메인 등장!',c:'info'});log(`${nm}: [${cn(c)}]을(를) 메인 필드에 올렸다!`,s);break;}
+  case 'toMain':{const c=P.wait[a.w];P.wait[a.w]=null;c.ul=0;c.ul2=0;P.main=c;P.ap.s--;fx({k:'sfx',n:'place'});fx({k:'txt',s,u:c.u,t:'메인 등장!',c:'info'});log(`${nm}: [${cn(c)}]을(를) 메인 필드에 올렸다!`,s);break;}
   case 'toSub':{const c=P.wait[a.w];P.wait[a.w]=null;P.sub=c;P.ap.s--;fx({k:'sfx',n:'place'});log(`${nm}: [${cn(c)}]을(를) 서브 필드에 올렸다.`,s);break;}
-  case 'mainDown':{const i=P.wait.indexOf(null);const c=P.main;c.ul=0;P.main=null;P.wait[i]=c;P.ap.s--;fx({k:'sfx',n:'place'});log(`${nm}: 메인 필드의 [${cn(c)}]을(를) 대기 필드로 내렸다.`,s);break;}
+  case 'mainDown':{const i=P.wait.indexOf(null);const c=P.main;c.ul=0;c.ul2=0;P.main=null;P.wait[i]=c;P.ap.s--;fx({k:'sfx',n:'place'});log(`${nm}: 메인 필드의 [${cn(c)}]을(를) 대기 필드로 내렸다.`,s);break;}
   case 'subDown':{const i=P.wait.indexOf(null);const c=P.sub;P.sub=null;P.wait[i]=c;P.ap.s--;fx({k:'sfx',n:'place'});log(`${nm}: 서브 필드의 [${cn(c)}]을(를) 대기 필드로 내렸다.`,s);break;}
   case 'cast':{const c=P.hand.splice(a.h,1)[0];P.ap.s--;fx({k:'cast',id:c.id,s});log(`${nm}: 마법 [${CARDS[c.id].name}] 발동!`,s,'mg');doCast(s,c);break;}
   case 'atk':{P.ap.m--;doAttack(s,a.k,a.tgt||{z:'player'});break;}
@@ -3707,7 +3720,7 @@ function renderAP(){
  const key=s+'_'+G.turnNo;const jm=lastAP&&lastAP.k===key&&lastAP.m>P.ap.m;const js=lastAP&&lastAP.k===key?lastAP.s:9;
  $('#gems').innerHTML=`<div class="gemrow"><div class="gem red ${P.ap.m<1?'used':''} ${jm?'justused':''}"></div></div><div class="gemlbl">메인 행동 ${P.ap.m} / 1</div><div class="gemrow">${[0,1].map(i=>`<div class="gem blue ${P.ap.s<=i?'used':''} ${P.ap.s<=i&&js>i?'justused':''}"></div>`).join('')}</div><div class="gemlbl">서브 행동 ${P.ap.s} / 2</div>`;
  lastAP={k:key,m:P.ap.m,s:P.ap.s};
- const notes=[];if(G.turnNo===1)notes.push('선공 첫 턴: 공격 불가');if(P.main&&P.main.sl)notes.push('메인 유닛 봉인됨');if(P.main&&P.main.ul)notes.push('궁극기 사용 가능!');
+ const notes=[];if(G.turnNo===1)notes.push('선공 첫 턴: 공격 불가');if(P.main&&P.main.sl)notes.push('메인 유닛 봉인됨');if(P.main&&(P.main.ul||P.main.ul2))notes.push('궁극기 사용 가능!');
  $('#apNote').textContent=notes.join(' · ');
  $('#btnEnd').disabled=!mine||G.winner!=null;$('#btnDraw').disabled=!mine||!!check('draw');
 }
@@ -3781,7 +3794,7 @@ function showMenu(anchor,title,items){
  m.onclick=e=>{const b=e.target.closest('.mi');if(!b)return;const it=items[+b.dataset.i];if(it.dis){SFX.play('err');toast(it.dis);return;}hideMenu();SFX.play('click');it.f();};
 }
 function startAttack(k){
- const P=G.p[mySeat];const C=CARDS[P.main.id];const s=k==='u'?C.ult:C.sk[k];
+ const P=G.p[mySeat];const C=CARDS[P.main.id];const s=k==='u'?C.ult:k==='u2'?C.ult2:C.sk[k];
  if(s.t==='one'){TG={k};render();SFX.play('click');}
  else act('atk',{k});
 }
@@ -3817,7 +3830,8 @@ $('#arena').addEventListener('click',e=>{
   C.sk.forEach((s,k)=>{const b=hitBonus(mySeat,s.t!=='one');items.push({l:`${k+1}번 공격 · ${s.n}`,cost:'m',d:skillDesc(s)+(b?` (현재 보너스 +${b}${synTotals(G.p[mySeat]).atk?` · 그중 시너지 +${synTotals(G.p[mySeat]).atk}`:''})`:''),dis:check('atk',{k}),f:()=>startAttack(k)});});
   if(c.id==='megumi')items.push({l:'식신 강림 · 마허라',cls:'ultb',cost:'m',d:'메구미를 대가로 팔악검 이계신장 마허라를 소환 (대전당 1회)',dis:check('summon'),f:()=>act('summon')});
   if(C.dual)items.push({l:`2번 · 패시브 「${C.pas.n}」`,d:C.pas.d,dis:'서브 필드에 있을 때만 발동하는 패시브입니다',f:()=>{}});
-  if(C.ult)items.push({l:`궁극기 · ${C.ult.n}`,cls:'ultb',cost:'m',d:skillDesc(C.ult),dis:c.ul?check('atk',{k:'u'}):'잠김 — '+condText(c.id),f:()=>startAttack('u')});
+  if(C.ult)items.push({l:`궁극기${C.ult2?' ①':''} · ${C.ult.n}`,cls:'ultb',cost:'m',d:skillDesc(C.ult),dis:c.ul?check('atk',{k:'u'}):'잠김 — '+condText(c.id),f:()=>startAttack('u')});
+  if(C.ult2)items.push({l:`궁극기 ② · ${C.ult2.n}`,cls:'ultb',cost:'m',d:skillDesc(C.ult2),dis:c.ul2?check('atk',{k:'u2'}):'잠김 — '+condText(c.id,C.ult2),f:()=>startAttack('u2')});
   items.push({l:'대기 필드로 내리기',cost:'s',dis:check('mainDown'),f:()=>act('mainDown')});
   showMenu(t,`메인 필드 · ${C.name}`,items);return;}
  if(z==='sub'){const c=P.sub;if(!c)return;showMenu(t,`서브 필드 · ${CARDS[c.id].name}`,[{l:'대기 필드로 내리기',cost:'s',d:CARDS[c.id].d,dis:check('subDown'),f:()=>act('subDown')}]);return;}
@@ -3891,7 +3905,7 @@ function aiTick(){
 function aiPick(s){
  const P=G.p[s],O=G.p[1-s],H=P.hand;const typ=c=>CARDS[c.id].type;const free=P.wait.indexOf(null);const can=(t,a)=>!check(t,a||{});
  const m=P.main;
- const catalystNeeded=id=>[P.main,...P.wait,...H].some(c=>c&&CARDS[c.id].ult&&CARDS[c.id].ult.mg.includes(id));
+ const catalystNeeded=id=>[P.main,...P.wait,...H].some(c=>c&&ultsOf(CARDS[c.id]).some(x=>x.U.mg.includes(id)));
  if(P.ap.s>0){
   if(m){const U=CARDS[m.id].ult;
    if(U&&!m.ul){const subOk=P.sub&&(U.sub==='any'||U.sub.includes(P.sub.id));const hi=H.findIndex(c=>U.mg.includes(c.id));
@@ -3903,6 +3917,7 @@ function aiPick(s){
       const wi=P.wait.findIndex(okSub);if(wi>=0&&!P.sub)return['toSub',{w:wi}];
       const hs=H.findIndex(okSub);if(hs>=0&&free>=0)return['toWait',{h:hs}];
      }}}}
+  if(m){for(const x of ultsOf(CARDS[m.id]).slice(1)){const U=x.U;if(!m[x.f]&&P.sub&&U.sub.includes(P.sub.id)){const hi=H.findIndex(c=>U.mg.includes(c.id));if(hi>=0&&can('cast',{h:hi}))return['cast',{h:hi}];}}}
   if(m&&CARDS[m.id].ult&&!m.ul&&canDraw(P)&&!H.some(c=>CARDS[m.id].ult.mg.includes(c.id))&&P.sub&&H.length<8)return['draw'];
   if(!m){
    let best=-1,bv=-1;P.wait.forEach((c,i)=>{if(c&&typ(c)==='unit'){const v=c.hp+CARDS[c.id].tier*4;if(v>bv){bv=v;best=i}}});if(best>=0)return['toMain',{w:best}];
@@ -3933,14 +3948,14 @@ function aiAttack(s){
  const P=G.p[s],O=G.p[1-s],m=P.main;const C=CARDS[m.id];const d=1-s;
  const tgts=[{z:'player'}];if(O.main)tgts.push({z:'main'});if(O.sub)tgts.push({z:'sub'});O.wait.forEach((c,i)=>{if(c&&!O.veil)tgts.push({z:'wait',i})});
  const ev=(dm,r)=>{if(r.z==='player')return dm*(O.hp<=dm?3:1.25);const c=refCard(O,r);const kill=dm>=c.hp;return Math.min(dm,c.hp)*(r.z==='main'?1.1:.7)+(kill?(r.z==='main'?15:6):0);};
- const ks=C.sk.map((_,i)=>i);if(m.ul)ks.push('u');const opts=[];
- for(const k of ks){const sk=k==='u'?C.ult:C.sk[k];const per=sk.p+hitBonus(s,sk.t!=='one');const h=sk.hits||1;let val=0,tgt=null;
+ const ks=C.sk.map((_,i)=>i);if(m.ul)ks.push('u');if(m.ul2)ks.push('u2');const opts=[];
+ for(const k of ks){const isU=k==='u'||k==='u2';const sk=k==='u'?C.ult:k==='u2'?C.ult2:C.sk[k];const per=sk.p+hitBonus(s,sk.t!=='one');const h=sk.hits||1;let val=0,tgt=null;
   if(sk.t==='one'){for(const r of tgts){const v=ev(per*h,r);if(v>val){val=v;tgt=r}}}
   else if(sk.t==='guard')val=m.hp<m.mhp*.5?7:2;
   else if(sk.t==='soul')val=O.main?O.main.hp+16:per*1.2;
-  else if(sk.t==='rand')val=randTargets(d,{pierce:sk.pierce,ignoreProt:sk.ignoreProt},k==='u').length?per*h*.95:0;
-  else{for(const r of areaRefs(d,sk.t,k==='u')){if(r.z==='wait'&&O.veil)continue;if(O.simple&&r.z!=='player'&&!sk.pierce)continue;val+=ev(per,r)*.9;}}
-  if(sk.self)val-=sk.self*.6;if(sk.selfKill)val-=8;if(k==='u')val+=10;
+  else if(sk.t==='rand')val=randTargets(d,{pierce:sk.pierce,ignoreProt:sk.ignoreProt},isU).length?per*h*.95:0;
+  else{for(const r of areaRefs(d,sk.t,isU)){if(r.z==='wait'&&O.veil)continue;if(O.simple&&r.z!=='player'&&!sk.pierce)continue;val+=ev(per,r)*.9;}}
+  if(sk.self)val-=sk.self*.6;if(sk.selfKill)val-=8;if(isU)val+=10;
   opts.push({k,tgt,val:val+Math.random()});}
  opts.sort((a,b)=>b.val-a.val);const o=opts[0];if(!o)return null;
  return['atk',{k:o.k,tgt:o.tgt||{z:'player'}}];
@@ -4032,7 +4047,7 @@ const TUT=[
 <div class="warn">해방된 유닛을 메인 필드에서 내리면 해방 상태가 사라집니다. 순서가 중요합니다 — 반드시 유닛과 서브 카드를 먼저 배치한 후 마법을 사용하세요!</div>
 <h4>궁극기 조합표</h4>
 <table><tr><th>유닛</th><th>궁극기</th><th>서브 필드</th><th>촉매 마법</th></tr>
-${ULT_UNITS.map(id=>{const U=CARDS[id].ult;return `<tr><td>${esc(CARDS[id].sn)}</td><td>${esc(U.n)}<br><small style="color:var(--mut)">${esc(skillDesc(U))}</small></td><td>${U.sub==='any'?'아무 서브 카드':U.sub.map(s=>esc(CARDS[s].sn)).join(' 또는 ')}</td><td>${U.mg.map(m=>esc(CARDS[m].name)).join(' 또는 ')}</td></tr>`}).join('')}</table>`],
+${ULT_UNITS.flatMap(id=>ultsOf(CARDS[id]).map(x=>[id,x.U])).map(([id,U])=>{return `<tr><td>${esc(CARDS[id].sn)}</td><td>${esc(U.n)}<br><small style="color:var(--mut)">${esc(skillDesc(U))}</small></td><td>${U.sub==='any'?'아무 서브 카드':U.sub.map(s=>esc(CARDS[s].sn)).join(' 또는 ')}</td><td>${U.mg.map(m=>esc(CARDS[m].name)).join(' 또는 ')}</td></tr>`}).join('')}</table>`],
 ['시너지',()=>`<h3>시너지</h3>
 <p><b>메인 필드의 유닛</b>과 짝이 맞는 카드가 <b>내 서브 필드나 대기 필드</b>에 함께 있으면 시너지가 발동해 메인 유닛이 강해집니다.</p>
 <ul><li>발동 중이면 메인 유닛 카드에 <b>「시너지」</b> 표시가 붙고, 왼쪽 플레이어 정보와 전투 로그에 시너지 이름이 나옵니다.</li>
