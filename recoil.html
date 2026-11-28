@@ -6525,8 +6525,8 @@ const TitleScene = {
     this.menu = new Menu([
       { label: '온라인 대전', hint: 'QR 코드나 방 코드로 1:1 · 2:2 · 4:4 대전', action: () => goto(OnlineScene) },
       { label: '연습 대전', hint: 'AI 대전 / 콤보 연구 및 연습', action: () => goto(PracticeScene()) },
-      { label: '캐릭터 선택', hint: '현재 캐릭터: ' + Game.p1Char, action: () => goto(CharScene) },
-      { label: '튜토리얼', hint: '조작법과 전투 시스템을 단계별로 배웁니다', action: () => goto(new Battle({ mode: 'tutorial', p1: Game.p1Char, p2: 'ORIN' })) },
+      { label: '캐릭터 도감', hint: '모든 캐릭터의 역할·능력치·기술 보기 (캐릭터는 대전 시작 때 고름)', action: () => goto(viewChars()) },
+      { label: '튜토리얼', hint: '조작법과 전투 시스템을 단계별로 배웁니다', action: () => goto(pickChar('튜토리얼 캐릭터 선택', id => goto(new Battle({ mode: 'tutorial', p1: id, p2: 'ORIN' })), () => goto(TitleScene))) },
       { label: '조작키', hint: '조작키만 간단히 보기', action: () => goto(ControlsScene) }
     ]);
   },
@@ -6551,7 +6551,11 @@ const TitleScene = {
   }
 };
 
+// 캐릭터 화면 두 가지: 대전 시작 전 '캐릭터 선택' / 홈 화면 '캐릭터 도감'(보기 전용)
+function pickChar(title, onPick, onBack) { CharScene.cfg = { pick: true, title, onPick, onBack }; return CharScene; }
+function viewChars() { CharScene.cfg = { pick: false, title: '캐릭터 도감', onBack: () => goto(TitleScene) }; return CharScene; }
 const CharScene = {
+  cfg: { pick: false, title: '캐릭터 도감', onBack: () => goto(TitleScene) },
   enter() {
     this.sel = Math.max(0, CHAR_LIST.indexOf(Game.p1Char)); this.t = 0; Music.play('menu');
     this.prev = CHAR_LIST.map((id, i) => new Fighter(id, 0, 100, MenuBG.map || pickRandomMap()));
@@ -6564,12 +6568,13 @@ const CharScene = {
     if (Keys.mouseMoved) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) this.sel = i; });
     let clicked = false;
     if (Keys.pressed.has('Mouse0')) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) { this.sel = i; clicked = true; } });
-    if (MI.ok() || clicked) { Game.p1Char = CHAR_LIST[this.sel]; SFX.play('select'); goto(TitleScene); }
-    else if (MI.back()) { SFX.play('back'); goto(TitleScene); }
+    const c = this.cfg;
+    if ((MI.ok() || clicked) && c.pick) { Game.p1Char = CHAR_LIST[this.sel]; SFX.play('select'); c.onPick(Game.p1Char); }
+    else if (MI.back()) { SFX.play('back'); c.onBack(); }
   },
   render() {
     MenuBG.draw();
-    kText('캐릭터 선택', VW / 2, 4, PAL.yellow, { align: 'center', size: 13 });
+    kText(this.cfg.title, VW / 2, 4, PAL.yellow, { align: 'center', size: 13 });
     this.rects = [];
     // 위: 캐릭터 카드 / 아래: 고른 캐릭터 상세
     const n = CHAR_LIST.length, cw = Math.floor((VW - 16 - (n - 1) * 4) / n);
@@ -6577,10 +6582,12 @@ const CharScene = {
       const d = CHARS[id], info = CHAR_INFO[id], x = 8 + i * (cw + 4), y = 18, w = cw, h = 66, sel = i === this.sel;
       this.rects.push({ x, y, w, h });
       panel(x, y, w, h, 0.9, sel ? (this.t % 20 < 14 ? PAL.yellow : PAL.orange) : PAL.indigo);
-      if (Game.p1Char === id) drawText('NOW', x + w - 4, y + 4, PAL.green, { align: 'right' });
-      const small = n > 3, ps = small ? 1.7 : 2, px = small ? x + 17 : x + 22, tx = small ? x + 34 : x + 44, rl = roleOf(id);
+      if (this.cfg.pick && Game.p1Char === id) drawText('LAST', x + w - 4, y + 4, PAL.green, { align: 'right' });
+      const small = n > 3, ps = small ? 1.7 : 2, px = (small ? x + 17 : x + 22) + (d.hover ? 8 : 0), tx = small ? x + 34 : x + 44, rl = roleOf(id);
+      g.save(); g.beginPath(); g.rect((x + 1) * RES, (y + 1) * RES, (w - 2) * RES, (h - 2) * RES); g.clip();   // 카드 밖으로 안 나가게
       drawFighterScaled(this.prev[i], px, y + 62, ps);
-      R(px - 14, y + 63, 28, 1.5, SIDE_COL[0]);
+      g.restore();
+      R(px - 14 - (d.hover ? 0 : 0), y + 63, 28, 1.5, SIDE_COL[0]);
       drawText(d.name, tx, y + 8, sel ? PAL.white : PAL.lgray, { scale: 2 });
       R(tx - 1, y + 21, 26, 11, '#141628'); rectLine(tx - 1, y + 21, 26, 11, rl.col);
       kText(rl.ko, tx + 12, y + 22, rl.col, { align: 'center', size: 10 });
@@ -6605,7 +6612,7 @@ const CharScene = {
     });
     kText(CHAR_INFO[CHAR_LIST[this.sel]].desc, VW / 2, 140, PAL.cyan, { align: 'center', size: 10 });
     const rlx = roleOf(CHAR_LIST[this.sel]); kText('[' + rlx.ko + '] ' + rlx.desc, VW / 2, 152, rlx.col, { align: 'center', size: 10 });
-    kText('A/D 선택   ENTER 결정   ESC 뒤로', VW / 2, VH - 15, PAL.gray, { align: 'center' });
+    kText(this.cfg.pick ? 'A/D 선택   ENTER·클릭 결정 (대전 시작)   ESC 뒤로' : 'A/D·마우스로 둘러보기   ESC 뒤로', VW / 2, VH - 15, PAL.gray, { align: 'center' });
   }
 };
 
@@ -6638,19 +6645,17 @@ const PracticeScene = () => menuScene('연습 대전', '모드를 선택하세�
 ], () => goto(TitleScene));
 
 const AISetupScene = () => menuScene('AI 대전 설정', '매치마다 맵이 무작위로 정해집니다', () => [
-  { label: '내 캐릭터', value: () => Game.p1Char, change: d => { Game.p1Char = cycle(CHAR_LIST, Game.p1Char, d); } },
   { label: '상대 캐릭터', value: () => Game.p2Pick === 'RANDOM' ? '무작위' : Game.p2Pick, change: d => { Game.p2Pick = cycle([...CHAR_LIST, 'RANDOM'], Game.p2Pick, d); } },
   { label: 'AI 난이도', value: () => LEVEL_KO[Game.level], change: d => { Game.level = cycle(LEVELS, Game.level, d); },
     get hint() { return LEVEL_HINT[Game.level]; } },
-  { label: '대전 시작', action: () => goto(new Battle({ mode: 'ai', p1: Game.p1Char, p2: Game.p2Pick, level: Game.level })) },
+  { label: '캐릭터 선택 후 시작', action: () => goto(pickChar('내 캐릭터 선택', id => goto(new Battle({ mode: 'ai', p1: id, p2: Game.p2Pick, level: Game.level })), () => goto(AISetupScene()))) },
   { label: '뒤로', action: () => goto(PracticeScene()) }
 ], () => goto(PracticeScene()));
 
 const TrainSetupScene = () => menuScene('콤보 연구 및 연습', '대전 중 ESC로 언제든 설정을 바꿀 수 있습니다', () => [
-  { label: '내 캐릭터', value: () => Game.p1Char, change: d => { Game.p1Char = cycle(CHAR_LIST, Game.p1Char, d); } },
   { label: '더미 캐릭터', value: () => Game.dummyChar, change: d => { Game.dummyChar = cycle(CHAR_LIST, Game.dummyChar, d); } },
   { label: '더미 행동', value: () => DUMMY_KO[Game.dummy], change: d => { Game.dummy = cycle(DUMMY_LIST, Game.dummy, d); } },
-  { label: '연습 시작', action: () => goto(new Battle({ mode: 'training', p1: Game.p1Char, p2: Game.dummyChar, dummy: Game.dummy })) },
+  { label: '캐릭터 선택 후 시작', action: () => goto(pickChar('내 캐릭터 선택', id => goto(new Battle({ mode: 'training', p1: id, p2: Game.dummyChar, dummy: Game.dummy })), () => goto(TrainSetupScene()))) },
   { label: '뒤로', action: () => goto(PracticeScene()) }
 ], () => goto(PracticeScene()));
 
@@ -6987,7 +6992,7 @@ const OnlineScene = {
     MenuBG.draw();
     if (this.mode === 'menu') {
       kText('온라인 대전', VW / 2, 8, PAL.yellow, { align: 'center', size: 15 });
-      kText('내 캐릭터: ' + Game.p1Char + '   닉네임: ' + Game.nick, VW / 2, 26, PAL.lgray, { align: 'center' });
+      kText('닉네임: ' + Game.nick + '   · 캐릭터는 방에서 고릅니다', VW / 2, 26, PAL.lgray, { align: 'center' });
       panel(50, 44, 220, 4 * 17 + 12, 0.85);
       const hint = this.menu.draw(VW / 2, 50, 204, 17);
       if (hint) kText(hint, VW / 2, 128, PAL.cyan, { align: 'center' });
@@ -7716,16 +7721,15 @@ class TeamBattle {
 // 오프라인 팀 대전 설정 (나 + CPU 아군 vs CPU 적)
 const TeamSetupScene = () => menuScene('팀 대전 (CPU)', '넓은 맵 · 가장 가까운 적과 싸웁니다 · 팀 전멸 시 라운드 종료', () => [
   { label: '인원', value: () => Game.teamSize + ' : ' + Game.teamSize, change: () => { Game.teamSize = Game.teamSize === 2 ? 4 : 2; } },
-  { label: '내 캐릭터', value: () => Game.p1Char, change: d => { Game.p1Char = cycle(CHAR_LIST, Game.p1Char, d); } },
   { label: 'AI 난이도', value: () => LEVEL_KO[Game.level], change: d => { Game.level = cycle(LEVELS, Game.level, d); } },
-  { label: '대전 시작', action: () => {
+  { label: '캐릭터 선택 후 시작', action: () => goto(pickChar('내 캐릭터 선택', () => {
     const n = Game.teamSize, slots = [], uniq = CHAR_LIST.length >= UNIQUE_PICK_MIN;
     const rc = () => { const pool = uniq ? CHAR_LIST.filter(c => !slots.some(x => x.char === c)) : CHAR_LIST; const p = pool.length ? pool : CHAR_LIST; return p[Math.floor(Math.random() * p.length)]; };
     slots.push({ nick: Game.nick, char: Game.p1Char, team: 0, human: true });
     for (let i = 1; i < n; i++) slots.push({ nick: '아군 ' + i, char: rc(), team: 0 });
     for (let i = 0; i < n; i++) slots.push({ nick: '적 ' + (i + 1), char: rc(), team: 1 });
     goto(new TeamBattle({ mode: 'team', size: n, slots, mySlot: 0, level: Game.level }));
-  } },
+  }, () => goto(TeamSetupScene()))) },
   { label: '뒤로', action: () => goto(PracticeScene()) }
 ], () => goto(PracticeScene()));
 
