@@ -4021,9 +4021,13 @@ function horizArms(f, J, idle, reach, k, ph) {
 function horizBoxes(f, J, k) {
   const m = f.move, ph = f.phaseOf(k);
   if (ph !== 'a') return [];
-  const p = (k - m.startup + 1) / m.active;
-  if (p < 0.4) return [];
-  const sh = m.shape, S = J.shF, dv = dirOf(f.moveAim + (m.tilt || 0) * (p - 0.5)), out = [], s2 = sh.size;
+  const p = (k - m.startup + 1) / m.active, sh = m.shape, S = J.shF, out = [], s2 = sh.size;
+  if (p < 0.4) {                                                  // 칼이 몸 뒤를 지나는 순간: 등 뒤의 적도 벰 (다인전용)
+    const bv = dirOf(PI - f.moveAim);
+    for (let r = 4; r <= sh.r1 * 0.75; r += s2 * 0.8) { const c = vadd(S, bv, r); out.push({ x: c.x - s2 / 2, y: c.y - s2 / 2, w: s2, h: s2 }); }
+    return out;
+  }
+  const dv = dirOf(f.moveAim + (m.tilt || 0) * (p - 0.5));
   for (let r = sh.r0; r <= sh.r1; r += s2 * 0.8) { const c = vadd(S, dv, r); out.push({ x: c.x - s2 / 2, y: c.y - s2 / 2, w: s2, h: s2 }); }
   return out;
 }
@@ -4047,13 +4051,21 @@ function kaiNext(f) {
 // 첫 타: 숙이면 낮은 발차기, 달리거나 대시 중이면 무릎 돌진, 위로 노리면 올려치기, 아래면 낮은 발차기, 공중은 높이에 따라
 function kaiStart(f, inp) {
   const a = f.aim;
-  if (!f.onGround) return a < -0.55 ? 'aUP' : a > 0.75 ? 'aST' : 'aN1';
-  if (inp.crouch) return 'LK';
-  if (f.state === 'run' || f.state === 'dash' || f.running) return 'DK';
-  if (a < -0.55) return 'UP';
-  if (a > 0.45) return 'LK';
-  return 'N1';
+  let id;
+  if (!f.onGround) id = a < -0.55 ? 'aUP' : a > 0.75 ? 'aST' : 'aN1';
+  else if (inp.crouch) id = 'LK';
+  else if (f.state === 'run' || f.running) id = 'DK';                   // 무릎 돌진은 달리기에서만 (대시 X)
+  else id = a < -0.55 ? 'UP' : a > 0.45 ? 'LK' : 'N1';
+  // 콤보가 이어지는 중(대시 캔슬 등)이면 같은 연속 공격으로 취급 → 이미 쓴 기술은 다시 못 쓰고 횟수 제한도 그대로
+  if (kaiComboLive(f)) {
+    const used = f.kaiUsed || [];
+    if (used.length >= 5) return null;
+    if (used.includes(id)) id = kaiNext(f);
+  }
+  return id;
 }
+const KAI_REST = 18;   // 연속 공격 사이 숨 고르기 (프레임)
+const kaiComboLive = f => !!(f.opp && f.opp.combo > 0 && f.kaiUsed && f.kaiUsed.length);
 const KAI_MOVES = {
   N1: { name: 'QUICK CUT', arms: horizArms, boxesAt: horizBoxes, sword: true, normal: true, startup: 4, active: 3, recovery: 9, chain: kaiNext, whiffRecoil: 1.3, whiffExtra: 6, lean: 0.3,
     tilt: 0, shape: { type: 'thrust', r0: 6, r1: 25, size: 4.5 },        // 가로로 짧게 베기
@@ -4133,7 +4145,9 @@ const CHARS = {
     mats: KAI_MATS, fx: { col: PAL.orange },
     // 칼 가드: 보통 각도, 스킬이 없는 대신 가드 게이지가 조금 넉넉함
     guard: { name: 'BLADE GUARD', just: 9, gauge: 105, bsMul: 0.85, push: 1.0, jgStagger: 20, arc: 1.05, zone: false },
-    moves: KAI_MOVES, pickNormal: kaiStart, sheath: true, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
+    moves: KAI_MOVES, pickNormal: kaiStart, sheath: true, oneDashCancel: true, cleave: true,
+    // 어려운 대신 강함: 링크 판정이 좁고(일찍 1프레임·늦게 2프레임), 완벽하면 대미지 1.35배 · 늦으면 0.85배
+    link: { early: 1, late: 2, bonus: 1.35, stun: 3, sloppy: 0.85 }, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
   }
 };
 const CHAR_LIST = ['RAZE', 'ORIN', 'KAI'];
@@ -4324,6 +4338,10 @@ class Fighter {
     this.integrate();
     if (this.onGround && (this.state === 'walk' || this.state === 'run')) this.stepPh += this.vx * this.facing / (this.state === 'run' ? 4.6 : 2.8);
     this.sway += (clamp(-this.vx * 0.9, -2.5, 2.5) - this.sway) * 0.15;
+    if (this.def.pickNormal) {                     // KAI: 연속 공격이 끝나면 잠깐 숨 고르기 → 상대에게 반격·이동할 틈을 보장 (막 눌러서는 계속 못 몰아침)
+      if (this.kaiUsed && this.kaiUsed.length && !kaiComboLive(this) && this.state !== 'attack') { this.kaiUsed = []; this.dcUsed = false; this.kaiRest = KAI_REST; }
+      if (this.kaiRest > 0) this.kaiRest--;
+    }
     if (this.def.sheath) {                         // 칼을 쓰는 동안(베기·가드)은 뽑은 채, 안 쓰면 잠시 뒤 칼집에 꽂음
       const use = (this.state === 'attack' && this.move && (this.move.sword || this.drawnT > 12)) || this.isGuarding();
       if (use) this.drawnT = 50; else if (this.drawnT > 0) this.drawnT--;
@@ -4428,7 +4446,9 @@ class Fighter {
     const b = this.buf; let id;
     if (b === 'atk') {
       if (!this.onGround && this.airAtk >= 2) return false;
+      if (this.def.pickNormal && this.kaiRest > 0) return false;      // 숨 고르는 중 (버퍼는 유지)
       id = this.def.pickNormal ? this.def.pickNormal(this, inp) : this.onGround ? 'N1' : 'aN1';   // 상황마다 다른 첫 평타 (KAI)
+      if (!id) { this.buf = null; return false; }                      // 이번 콤보에서 더 쓸 평타가 없음
     } else {
       id = skillId(this, b);
       if (!this.def.moves[id]) { this.buf = null; return false; }     // 스킬이 없는 캐릭터
@@ -4446,12 +4466,12 @@ class Fighter {
     this.dashT = 0;
     this.move = m; this.moveId = id; this.moveT = 0; this.moveK = 0;
     this.moveHit = false; this.moveBlocked = false; this.moveWhiff = false; this.recExtra = 0; this.lastHitGroup = -1;
-    this.linkOpen = 1e9; this.linkMiss = false; this.linkBonus = false;
+    this.linkOpen = 1e9; this.linkMiss = false; this.linkBonus = false; this.linkLate = false; this.hitList = [];
     this.moveAim = this.clampAim(m, this.aim);
     this.state = 'attack'; this.animT = 0; this.running = false;
     const pitch = this.def.pitch || (this.def.id === 'ORIN' ? 0.6 : 1.25);
     if (this.def.pickNormal) {                         // 한 연속 공격에서 쓴 평타 기록 → 다음 타는 다른 기술
-      if (!this.chainNext) { this.kaiUsed = []; if (m.air) this.airAtk++; }
+      if (!this.chainNext) { if (!kaiComboLive(this)) { this.kaiUsed = []; this.dcUsed = false; } if (m.air) this.airAtk++; }
       this.kaiUsed.push(id);
     }
     this.chainNext = false;
@@ -4466,7 +4486,9 @@ class Fighter {
     this.moveK = k;
     const connected = this.moveHit || this.moveBlocked;
     if (connected && k >= m.startup) {
-      if (this.dashBuf > 0 && this.canDash()) { this.startDash(dir || this.facing); emit('dashCancel', { f: this }); return; }
+      if (this.dashBuf > 0 && this.canDash() && !(this.def.oneDashCancel && this.dcUsed)) {   // KAI: 대시 캔슬은 한 콤보에 한 번
+        this.dcUsed = true; this.startDash(dir || this.facing); emit('dashCancel', { f: this }); return;
+      }
       if (inp.guardH) { this.enterGuard(); return; }
       if (this.moveHit && this.jumpBuf > 0 && !m.noJumpCancel) {        // 점프 캔슬: 지상 → 점프, 공중 → 2단 점프
         if (this.onGround) { this.move = null; this.doJump(); this.jumpCut = true; emit('jumpCancel', { f: this }); return; }   // 점프 캔슬은 항상 최대 높이
@@ -4477,12 +4499,12 @@ class Fighter {
       if (this.buf && (this.buf === 'atk' || SKILL_MOVE[this.buf])) {
         let perfect = false;
         if (this.linkMiss) this.buf = null;
-        else if (this.bufPressHT < this.linkOpen - 2) {
+        else if (this.bufPressHT < this.linkOpen - (this.def.link ? this.def.link.early : 2)) {
           this.linkMiss = true; this.buf = null;
           Popups.add('DROP', this.x, this.topY - 6, PAL.gray); emit('linkDrop', { f: this });
-        } else perfect = this.bufPressHT <= this.linkOpen + 3;
+        } else perfect = this.bufPressHT <= this.linkOpen + (this.def.link ? this.def.link.late : 3);
         const next = this.buf === 'atk' && m.chain ? (typeof m.chain === 'function' ? m.chain(this) : m.chain) : null;
-        if (next) { this.buf = null; this.chainNext = true; this.startMove(next); this.linkBonus = perfect; return; }
+        if (next) { this.buf = null; this.chainNext = true; this.startMove(next); this.linkBonus = perfect; this.linkLate = !perfect; return; }
         if (this.buf && this.buf !== 'atk') {
           const slot = this.buf;
           if (this.def.moves[skillId(this, slot)] && this.cd[slot] === 0 && (m.normal || (this.moveHit && m.skill !== slot))) {
@@ -4761,9 +4783,11 @@ const Combat = {
     for (const atk of fs) {
       if (!atk.hitboxes.length || !atk.move) continue;
       const grp = atk.hitGroup();
-      if (grp === atk.lastHitGroup) continue;
+      const cleave = atk.def.cleave;                                   // KAI: 한 번 휘두르면 닿은 적을 각각 한 번씩 (여러 명 동시에)
+      if (grp === atk.lastHitGroup && !cleave) continue;
       for (const def of targets(atk)) {
         if (!def.hittable()) continue;
+        if (cleave && (atk.hitList || []).includes(def.slot !== undefined ? def.slot : def.side)) continue;
         const t = this.touch(atk.hitboxes, def, atk.chest());
         const tdir = atk.move.shape && atk.move.shape.type === 'thrust' ? atk.aimWorldDir(atk.moveAim) : null;
         if (t) ev.push(Object.assign({ atk, def, hp: this.hitParams(atk.move, grp), grp, pt: t.pt, t: atk.activeStartTick,
@@ -4803,7 +4827,7 @@ const Combat = {
     const { atk, def } = e;
     const dir = e.dirv && Math.abs(e.dirv.x) > 0.2 ? Math.sign(e.dirv.x) : (def.x > atk.x ? 1 : def.x < atk.x ? -1 : atk.facing);
     if (e.proj) { e.proj.hitDone = true; if (e.proj.kind === 'bolt') e.proj.alive = false; }
-    else atk.lastHitGroup = e.grp;
+    else { atk.lastHitGroup = e.grp; if (atk.def.cleave) (atk.hitList = atk.hitList || []).push(def.slot !== undefined ? def.slot : def.side); }
     const tier = e.hp.unblockable ? null : e.tier;
     if (tier === 'perfect') this.perfectGuard(e, dir);
     else if (tier === 'good') this.goodGuard(e, dir);
@@ -4870,7 +4894,8 @@ const Combat = {
     if (def.repeatHit && c > 0) dmg *= 0.65;                                 // 같은 기술 반복 페널티
     else if (c >= 2) dmg *= 1.1;                                             // 새 기술로 이을 때 보너스
     if (!e.proj && atk.moveId[0] === 'a' && !def.onGround) dmg *= 1.2;      // 공중 콤보 보너스
-    if (!e.proj && atk.linkBonus) dmg *= 1.2;                                // 완벽한 타이밍 링크 보너스
+    if (!e.proj && atk.linkBonus) dmg *= atk.def.link ? atk.def.link.bonus : 1.2;   // 완벽한 타이밍 링크 보너스
+    else if (!e.proj && atk.linkLate && atk.def.link) dmg *= atk.def.link.sloppy;   // KAI: 타이밍이 늦은 연결은 약함
     const finisher = !e.proj && c >= 4 && atk.move && atk.move.skill && !def.repeatHit;
     if (finisher) dmg *= 1.1;                                                // 긴 콤보를 스킬로 마무리 (스킬은 연결용이라 보너스는 작게)
     // 패닉: 맞는 중 우클릭 연타(3회 이상) 또는 계속 누르고 있으면 더 아프게
@@ -4884,7 +4909,7 @@ const Combat = {
     if (hp.minStun) stun = Math.max(stun, hp.minStun);
     if (e.counter || e.crush) stun = Math.round(stun * 1.5) + 6;
     if (def.repeatHit && c > 0) stun = Math.round(stun * 0.8);
-    if (!e.proj && atk.linkBonus) stun += 2;
+    if (!e.proj && atk.linkBonus) stun += atk.def.link ? atk.def.link.stun : 2;
     stun = Math.max(3, Math.round(stun * Math.max(0.35, 1 - def.lockT / 240)));   // 오래 갇힐수록 경직 감소 (콤보가 잠깐 끊겨도 누적)
     const limit = def.lockT > 200 || def.combo >= 15;                                 // 한계: 강제 다운 → 탈출
     const kb = hp.kb * (1 + 0.15 * c);
