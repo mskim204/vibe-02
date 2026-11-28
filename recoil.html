@@ -3839,16 +3839,20 @@ function baseHand(R, el, hand, gp) {
   const a = Math.atan2(hand.y - el.y, hand.x - el.x);
   R.ell(vadd(hand, dirOf(a), 0.25), 0.95, 0.75, a, 'skin', gp, true);
 }
-function drawHumanBase(R, f, J, o) {
+function drawHumanBase(R0, f, J, o) {
   const G = { aB: 2, wB: 3, lB: 4, body: 5, belt: 6, lF: 7, neck: 8, head: 9, smear: 10, wF: 11, aF: 12 };
   const { u, n, hip, neck, head, hu, hn } = J;
-  const sleeve = o.sleeve || o.top;
+  const sleeve = o.sleeve || o.top, k = o.k || 1;
+  // 작은 캐릭터(k < 1)는 팔다리 굵기도 같이 줄임 (머리는 그대로 → 귀여운 비율)
+  const R = k === 1 ? R0 : { cap: (a, b, r1, r2, m, g, h) => R0.cap(a, b, r1 * k, r2 * k, m, g, h), ell: (c, rx, ry, rot, m, g, h) => R0.ell(c, rx * k, ry * k, rot, m, g, h),
+    poly: (p, m, g, h) => R0.poly(p, m, g, h), dot: (p, c) => R0.dot(p, c), dline: (a, b, c) => R0.dline(a, b, c), set back(v) { R0.back = v; } };
+  if (o.behind) o.behind(R0, f, J);
   // 뒷팔 · 뒷다리
   R.back = 1;
   R.cap(J.shB, J.elB, 1.0, 0.84, o.top, G.aB, true);
   R.cap(J.elB, J.hB, 0.8, 0.68, sleeve, G.aB, true);
   baseHand(R, J.elB, J.hB, G.aB);
-  if (o.weaponBack) o.weaponBack(R, J, G.wB);
+  if (o.weaponBack) o.weaponBack(R0, J, G.wB);
   R.cap(J.hipB, J.knB, 1.45, 1.1, o.bottom, G.lB, true);
   R.cap(J.knB, J.anB, 1.08, 0.78, o.bottom, G.lB, true);
   R.cap(J.anB, vadd(J.anB, V(1.9, 0.25)), 0.76, 0.6, o.shoe, G.lB, true);
@@ -3857,7 +3861,7 @@ function drawHumanBase(R, f, J, o) {
   const waist = vadd(hip, u, 3.2);
   R.poly([vadd(hip, n, -1.9), vadd(vadd(waist, n, -1.55), u, 0), vadd(vadd(neck, n, -2.2), u, -1.2), vadd(vadd(neck, n, -1.3), u, 0.3),
           vadd(vadd(neck, n, 1.1), u, 0.35), vadd(vadd(neck, n, 2.1), u, -1.3), vadd(waist, n, 1.5), vadd(vadd(hip, n, 1.8), u, 0.2)], o.top, G.body, true);
-  if (o.belted) o.belted(R, J, G.belt);
+  if (o.belted) o.belted(R0, J, G.belt);
   if (o.belt) R.poly([vadd(vadd(hip, u, 0.4), n, -1.95), vadd(vadd(hip, u, 0.4), n, 1.85), vadd(vadd(hip, u, 1.3), n, 1.75), vadd(vadd(hip, u, 1.3), n, -1.85)], o.belt, G.belt, false);
   // 앞다리
   R.cap(J.hipF, J.knF, 1.5, 1.14, o.bottom, G.lF, true);
@@ -3865,18 +3869,19 @@ function drawHumanBase(R, f, J, o) {
   R.cap(J.anF, vadd(J.anF, V(1.9, 0.25)), 0.78, 0.62, o.shoe, G.lF, true);
   // 목 · 깃
   R.cap(vadd(neck, u, 0.2), vadd(head, hu, -2.6), 0.85, 0.8, 'skin', G.neck, true);
-  if (o.collar) o.collar(R, J, G.neck);
+  if (o.collar) o.collar(R0, J, G.neck);
   // 머리: 달걀형 (위가 넓고 턱이 살짝 좁음)
-  R.ell(vadd(head, hu, 0.2), 2.6, 3.25, J.ht, 'skin', G.head, true);
-  R.poly([vadd(vadd(head, hu, -0.8), hn, -1.6), vadd(vadd(head, hu, -0.8), hn, 2.0), vadd(vadd(head, hu, -3.1), hn, 1.1), vadd(vadd(head, hu, -3.2), hn, 0.0)], 'skin', G.head, true);
-  if (o.hairStyle) o.hairStyle(R, J, G.head);
-  R.dot(vadd(vadd(head, hu, 0.1), hn, 1.75), '#14141e');
-  drawSmear(R, J, G.smear);
+  R0.ell(vadd(head, hu, 0.2), 2.6, 3.25, J.ht, 'skin', G.head, true);
+  R0.poly([vadd(vadd(head, hu, -0.8), hn, -1.6), vadd(vadd(head, hu, -0.8), hn, 2.0), vadd(vadd(head, hu, -3.1), hn, 1.1), vadd(vadd(head, hu, -3.2), hn, 0.0)], 'skin', G.head, true);
+  if (o.hairStyle) o.hairStyle(R0, J, G.head);
+  R0.dot(vadd(vadd(head, hu, 0.1), hn, 1.75), '#14141e');
+  if (!o.noSmear) drawSmear(R0, J, G.smear);
   // 앞팔 (무기는 팔 아래에)
-  if (o.weapon) o.weapon(R, J, G.wF);
+  if (o.weapon) o.weapon(R0, J, G.wF);
   R.cap(J.shF, J.elF, 1.05, 0.88, o.top, G.aF, true);
   R.cap(J.elF, J.hF, 0.84, 0.7, sleeve, G.aF, true);
   baseHand(R, J.elF, J.hF, G.aF);
+  if (o.front) o.front(R0, f, J);
 }
 // KAI: 베이스 체형 + 수수한 갈색 옷 + 짧은 갈색 머리 + 일본도
 const KAI_LOOK = {
@@ -4117,9 +4122,163 @@ const KAI_MOVES = {
 };
 
 
+// ---------------------------------------------------------------------
+// AURA — 해파리 서포터 (작은 체구, 해파리 모자, 등 뒤의 큰 해파리가 전기 공격)
+//   근접전 게임: 사거리는 근접 캐릭터보다 '살짝' 긴 정도 (원거리 X)
+//   서포터: 자신과 팀원을 회복(E)·강화(R)하는 대신 공격력은 낮음
+// ---------------------------------------------------------------------
+const AURA_MATS = buildMats({
+  skin:  ['#fbe0c8', '#f0b892', '#c88462', '#5a2e20'],
+  dress: ['#ffd6ea', '#f49ac4', '#c86a9a', '#4a1a34'],
+  leg:   ['#fff2f8', '#ecccdc', '#b896ac', '#3a2434'],
+  shoe:  ['#eaffb8', '#b4e468', '#7aa83a', '#24380c'],
+  hair:  ['#fbf6ff', '#e4d6f2', '#b49ece', '#3e2c52'],
+  hat:   ['#ffe2f2', '#ff86c4', '#d2509a', '#5a1440'],
+  jelly: ['#fff0f8', '#ffb6da', '#e07cb4', '#6a2450'],     // 핑크 베이스
+  lime:  ['#f4ffd8', '#d4f59a', '#9cc860', '#2e4614'],     // 은은하게 섞인 연두
+  zap:   ['#ffffff', '#ffd2ec', '#d8ff96', '#ff5fae'],     // 핑크 + 연두 전기
+  smear: ['#ffffff', '#ffe0f2', '#e4ffb0', '#ff7cc0']
+});
+// 해파리 위치: 머리 뒤 위쪽에서 둥실둥실, 공격할 땐 조준 방향으로 살짝 다가감
+function jellyPos(f, J) {
+  const bob = Math.sin(f.frame * 0.07) * 1.2, atk = f.state === 'attack' && f.move;
+  let p = vadd(J.head, V(-8.5, -8 + bob));
+  if (atk) { const ph = f.phaseOf(f.moveK); if (ph !== 'r') p = vadd(p, dirOf(f.moveAim), ph === 'a' ? 3.5 : 1.5); }
+  return p;
+}
+function drawJelly(R, f, J) {
+  const c = jellyPos(f, J), t = f.frame, gp = 1;
+  // 촉수: 종 아랫단에서 물결치며 늘어짐
+  for (let i = 0; i < 5; i++) {
+    let p = vadd(c, V(-4.6 + i * 2.3, 3.4));
+    for (let s = 0; s < 4; s++) {
+      const q = vadd(p, V(Math.sin(t * 0.12 + i * 1.3 + s * 0.9) * 0.9 - f.vx * 0.25, 2.3));
+      R.cap(p, q, 0.42 - s * 0.06, 0.36 - s * 0.06, s % 2 ? 'lime' : 'jelly', gp, false);
+      p = q;
+    }
+  }
+  // 종(갓): 핑크 반투명 느낌 — 안쪽에 연두 빛 무늬
+  R.ell(c, 7.2, 5.2, 0, 'jelly', gp, false);
+  R.ell(vadd(c, V(0.3, 2.6)), 6.4, 1.6, 0, 'jelly', gp, false);
+  R.ell(vadd(c, V(-2.2, -0.6)), 1.1, 0.8, 0, 'lime', gp, false);
+  R.ell(vadd(c, V(1.4, -1.4)), 0.9, 0.6, 0, 'lime', gp, false);
+  R.ell(vadd(c, V(3.4, 0.6)), 0.7, 0.55, 0, 'lime', gp, false);
+  R.dot(vadd(c, V(-3.6, -2.4)), '#ffffff'); R.dot(vadd(c, V(-3.0, -3.0)), '#ffffff');
+}
+// 전기: 해파리에서 공격 지점까지 지그재그 번개 (핑크 + 연두)
+function drawZap(R, f, J) {
+  const s = J.smear;
+  if (!s || !(f.state === 'attack')) return;
+  const a = s.type === 'arc' ? s.a1 : s.type === 'ring' ? s.a : s.a;
+  const r1 = s.r1 || 24, A = vadd(jellyPos(f, J), V(0, 3.5)), B = vadd(J.shF, dirOf(a), r1);
+  const d = V(B.x - A.x, B.y - A.y), L = Math.hypot(d.x, d.y) || 1, pv = V(-d.y / L, d.x / L), n = 6, gp = 14;
+  let prev = A, prev2 = A;
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, w = i === n ? 0 : ((i + f.frame) % 2 ? 1 : -1) * (1.1 + ((i * 7 + f.frame) % 3) * 0.45);
+    const p = vadd(vadd(A, d, t), pv, w), p2 = vadd(vadd(A, d, t), pv, -w * 0.6 + 0.5);
+    R.cap(prev2, p2, 0.22, 0.22, 'lime', gp, false);
+    R.cap(prev, p, 0.42, 0.38, 'zap', gp, false);
+    prev = p; prev2 = p2;
+  }
+  R.ell(B, 1.6, 1.6, 0, 'zap', gp, false);                      // 끝의 스파크
+}
+const AURA_LOOK = {
+  top: 'dress', sleeve: 'dress', bottom: 'leg', shoe: 'shoe', k: 0.86, noSmear: true,
+  behind(R, f, J) { drawJelly(R, f, J); },
+  belted(R, J, gp) {                                             // 해파리 종처럼 퍼지는 짧은 치마
+    const { hip, u, n } = J;
+    R.poly([vadd(vadd(hip, u, 1.4), n, -1.9), vadd(vadd(hip, u, 1.4), n, 1.8), vadd(vadd(hip, u, -2.6), n, 3.0), vadd(vadd(hip, u, -2.0), n, 0.2), vadd(vadd(hip, u, -2.6), n, -3.1)], 'dress', gp, true);
+    for (let i = -2; i <= 2; i++) R.dot(vadd(vadd(hip, u, -2.2), n, i * 1.3), i % 2 ? '#d4f59a' : '#ffffff');
+  },
+  hairStyle(R, J, gp) {                                           // 해파리 모자 + 앞머리
+    const { head, hu, hn } = J;
+    // 연보라빛 머리 (앞머리 + 뒷머리)
+    R.cap(vadd(vadd(head, hu, 1.2), hn, 1.4), vadd(vadd(head, hu, 0.5), hn, 2.4), 0.7, 0.45, 'hair', gp, false);
+    R.cap(vadd(vadd(head, hu, 1.0), hn, -2.2), vadd(vadd(head, hu, -2.2), hn, -2.4), 1.0, 0.7, 'hair', gp, false);
+    // 해파리 모자: 머리 위에 얹힌 둥근 종 + 가장자리에서 늘어진 짧은 촉수
+    const top = vadd(head, hu, 2.7);
+    R.ell(top, 3.9, 2.3, J.ht, 'hat', gp, false);
+    R.cap(vadd(vadd(top, hu, -1.4), hn, -3.6), vadd(vadd(top, hu, -1.4), hn, 3.6), 0.55, 0.55, 'hat', gp, false);
+    for (let i = 0; i < 6; i++) {
+      const b = vadd(vadd(top, hu, -1.7), hn, -3.4 + i * 1.36), w = Math.sin(J.ht * 3 + i) * 0.3;
+      R.cap(b, vadd(vadd(b, hu, -1.5 - (i % 2) * 0.7), hn, w), 0.26, 0.18, i % 2 ? 'lime' : 'hat', gp, false);
+    }
+    R.ell(vadd(vadd(top, hu, 0.5), hn, -1.0), 0.9, 0.55, J.ht, 'lime', gp, false);
+    R.dot(vadd(vadd(top, hu, 1.0), hn, 1.2), '#ffffff'); R.dot(vadd(vadd(top, hu, 0.7), hn, 1.7), '#ffffff');
+  },
+  front(R, f, J) { drawZap(R, f, J); }
+};
+function drawAura(R, f, J) { drawHumanBase(R, f, J, AURA_LOOK); }
+function auraIdleArms(f, J, a) {
+  const S = J.shF, B = J.shB, br = Math.sin(f.animT * 0.08) * 0.3;
+  if (a === 'run' || a === 'dash') return { hF: vadd(S, V(-2.6, 3.6)), wAng: 0, hB: vadd(B, V(-3, 3)), wAngB: 0 };
+  if (a === 'jump' || a === 'fall') return { hF: vadd(S, V(2.6, -1.2)), wAng: 0, hB: vadd(B, V(-2.4, 1.2)), wAngB: 0 };
+  return { hF: vadd(S, V(2.8, 3.4 + br)), wAng: 0, hB: vadd(B, V(1.0, 4.0 + br)), wAngB: 0 };
+}
+function auraGuardArms(f, J, ga) {
+  const S = J.shF, gd = dirOf(ga), pv = V(-gd.y, gd.x);
+  return { hF: vadd(vadd(S, gd, 5.2), pv, -1.0), wAng: ga, hB: vadd(vadd(S, gd, 4.6), pv, 1.2), wAngB: ga };
+}
+// 같은 편 (팀 대전이면 살아있는 팀원 전체, 1:1이면 자기 자신)
+function alliesOf(f) { const W = World; return W && W.fs ? W.fs.filter(o => o.side === f.side && !o.out) : [f]; }
+function auraHeal(f) {
+  for (const o of alliesOf(f)) {
+    if (Math.abs(o.x - f.x) > 90 || Math.abs(o.y - f.y) > 60 || o.hp <= 0) continue;
+    const amt = Math.min(o.maxHp - o.hp, Math.round(o.maxHp * 0.07));
+    o.hp += amt;
+    FX.ring(o.x, o.y - 14, PAL.green, 10); Popups.add('+' + amt, o.x, o.topY - 14, PAL.green);
+  }
+  emit('heal', { f });
+}
+function auraBless(f) {
+  for (const o of alliesOf(f)) {
+    if (Math.abs(o.x - f.x) > 100 || Math.abs(o.y - f.y) > 70) continue;
+    o.buffT = 360;                                               // 6초: 주는 대미지 +20%, 받는 대미지 -10%
+    FX.ring(o.x, o.y - 14, PAL.pink, 12); Popups.add('BUFF', o.x, o.topY - 14, PAL.pink);
+  }
+  emit('buff', { f });
+}
+const AURA_HEAL_MOVE = (air) => ({ name: 'GLOW HEAL', skill: 's2', cd: 720, air, startup: 9, active: 1, recovery: 16, noWhiff: true,
+  shape: { type: 'thrust', r0: 0, r1: 0, size: 1, noHit: true },
+  arms(f, J) { return { hF: vadd(J.shF, V(1.6, -4.2)), wAng: 0, hB: vadd(J.shB, V(1.0, -3.8)), wAngB: 0, attacking: true }; },
+  onFrame(f, k) { if (k === f.move.startup) auraHeal(f); if (!f.onGround) f.vy = Math.min(f.vy, 0.6); return false; } });
+const AURA_BLESS_MOVE = (air) => ({ name: 'TIDE BLESS', skill: 's3', cd: 960, air, startup: 10, active: 6, recovery: 18, hitEvery: 6, whiffRecoil: 0, whiffExtra: 8,
+  shape: { type: 'area0', x: -24, y: -40, w: 48, h: 40 },
+  hit: { dmg: 14, hitstun: 18, blockstun: 10, kb: 2.6, kbY: -1.6, hitstop: 6, shake: 2, guardDmg: 12, blockPush: 2, chip: 0.1, kbDir: 'out' },
+  arms(f, J) { return { hF: vadd(J.shF, V(2.4, -3.6)), wAng: 0, hB: vadd(J.shB, V(-2.4, -3.2)), wAngB: 0, attacking: true, smear: null }; },
+  onFrame(f, k) { if (k === f.move.startup) { auraBless(f); FX.ring(f.x, f.y - 16, PAL.green, 22); } if (!f.onGround) f.vy = Math.min(f.vy, 0.6); return false; } });
+const AURA_LASH_MOVE = (air) => ({ name: 'ZAP LASH', skill: 's1', cd: 360, air, landCancel: air, startup: 6, active: 8, recovery: 14, hitEvery: 4, whiffRecoil: 1.4, whiffExtra: 10,
+  shape: { type: 'arc', from: -0.9, to: 0.7, r0: 8, r1: 32, size: 3.5 },     // 해파리 촉수 전기 채찍 (2타)
+  hit: { dmg: 16, hitstun: 18, minStun: 14, blockstun: 10, kb: 1.2, kbY: -1.0, hitstop: 4, guardDmg: 10, blockPush: 1.2, chip: 0.1 },
+  finisher: { dmg: 22, hitstun: 24, kb: 2.2, kbY: -2.4, hitstop: 7, shake: 1 } });
+const AURA_MOVES = {
+  N1: { name: 'STING', normal: true, startup: 5, active: 3, recovery: 10, chain: 'N2', whiffRecoil: 1.4, whiffExtra: 7, lean: 0.2,
+    shape: { type: 'thrust', r0: 8, r1: 26, size: 3.5 },
+    hit: { dmg: 22, hitstun: 16, blockstun: 10, kb: 1.2, hitstop: 4, guardDmg: 9, blockPush: 1.5 }, onFrame: stepForward(0.5) },
+  N2: { name: 'ARC ZAP', normal: true, startup: 6, active: 3, recovery: 12, chain: 'N3', whiffRecoil: 1.6, whiffExtra: 8,
+    shape: { type: 'arc', from: -0.8, to: 0.55, r0: 8, r1: 26, size: 3.5 },
+    hit: { dmg: 26, hitstun: 17, blockstun: 11, kb: 1.4, hitstop: 5, guardDmg: 11, blockPush: 1.7 }, onFrame: stepForward(0.5) },
+  N3: { name: 'JOLT', normal: true, startup: 8, active: 4, recovery: 16, whiffRecoil: 2.0, whiffExtra: 10, lean: 0.15,
+    shape: { type: 'thrust', r0: 8, r1: 28, size: 4 },
+    hit: { dmg: 34, hitstun: 26, blockstun: 13, kb: 0.7, kbY: -4.4, hitstop: 7, shake: 1, guardDmg: 16, blockPush: 2.2 },   // 띄우기
+    onFrame: stepForward(0.4) },
+  aN1: { name: 'AIR STING', normal: true, air: true, landCancel: true, chain: 'aN2', startup: 5, active: 4, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+    shape: { type: 'thrust', r0: 8, r1: 25, size: 3.5 },
+    hit: { dmg: 24, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -1.8, hitstop: 5, guardDmg: 10, blockPush: 1.4 } },
+  aN2: { name: 'AIR ARC', normal: true, air: true, landCancel: true, chain: 'aN3', startup: 5, active: 4, recovery: 11, whiffRecoil: 0.4, whiffExtra: 6,
+    shape: { type: 'arc', from: -0.8, to: 0.7, r0: 8, r1: 24, size: 3.5 },
+    hit: { dmg: 24, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -2.2, hitstop: 5, guardDmg: 10, blockPush: 1.4 } },
+  aN3: { name: 'DOWN JOLT', normal: true, air: true, landCancel: true, startup: 7, active: 4, recovery: 14, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.4, 1.45],
+    shape: { type: 'thrust', r0: 8, r1: 26, size: 4 },
+    hit: { dmg: 32, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 8, shake: 2, guardDmg: 14, blockPush: 2 } },
+  Q: AURA_LASH_MOVE(false), aQ: AURA_LASH_MOVE(true),
+  E: AURA_HEAL_MOVE(false), aE: AURA_HEAL_MOVE(true),
+  R: AURA_BLESS_MOVE(false), aR: AURA_BLESS_MOVE(true)
+};
+
 const CHARS = {
   RAZE: {
-    id: 'RAZE', name: 'RAZE', title: 'SHADOW DAGGER', style: 'RUSHDOWN', hp: 950,
+    id: 'RAZE', name: 'RAZE', title: 'SHADOW DAGGER', style: 'RUSHDOWN', role: 'DEALER', hp: 950,
     walk: 1.5, run: 2.9, jumpV: -5.7, grav: 0.32, airAcc: 0.28, dashMul: 1.05,
     dim: { hipH: 11, thigh: 5.9, shin: 5.9, torso: 8, headR: 3.2, upper: 4.8, fore: 4.6, crouchH: 15, crouchTop: 16.2 },
     mats: RAZE_MATS, scarf: { n: 7, len: 1.7, grav: 0.07, damp: 0.86 },
@@ -4129,7 +4288,7 @@ const CHARS = {
     moves: RAZE_MOVES, draw: drawRaze, idleArms: razeIdleArms, guardArms: razeGuardArms, offhand: razeOffhand
   },
   ORIN: {
-    id: 'ORIN', name: 'ORIN', title: 'IRON LANCER', style: 'ZONER', hp: 1050,
+    id: 'ORIN', name: 'ORIN', title: 'IRON LANCER', style: 'ZONER', role: 'TANK', hp: 1050,
     walk: 1.2, run: 2.35, jumpV: -5.5, grav: 0.33, airAcc: 0.20, dashMul: 0.92,
     dim: { hipH: 12, thigh: 6.4, shin: 6.4, torso: 9, headR: 3.4, upper: 5.2, fore: 5.0, crouchH: 16, crouchTop: 17.5 },
     mats: ORIN_MATS, scarf: { n: 4, len: 1.6, grav: 0.03, damp: 0.8 },
@@ -4139,7 +4298,7 @@ const CHARS = {
     moves: ORIN_MOVES, draw: drawOrin, idleArms: orinIdleArms, guardArms: orinGuardArms, offhand: orinOffhand
   },
   KAI: {
-    id: 'KAI', name: 'KAI', title: 'WANDERING BLADE', style: 'DUELIST', hp: 1000, noSkills: true, pitch: 1.0,
+    id: 'KAI', name: 'KAI', title: 'WANDERING BLADE', style: 'DUELIST', role: 'UTILITY', hp: 1000, noSkills: true, pitch: 1.0,
     walk: 1.4, run: 2.7, jumpV: -5.6, grav: 0.32, airAcc: 0.25, dashMul: 1.0,
     dim: { hipH: 11, thigh: 5.9, shin: 5.9, torso: 8, headR: 3.2, upper: 4.8, fore: 4.6, crouchH: 15, crouchTop: 16.2 },   // 베이스 체형 = RAZE와 같은 크기
     mats: KAI_MATS, fx: { col: PAL.orange },
@@ -4148,9 +4307,28 @@ const CHARS = {
     moves: KAI_MOVES, pickNormal: kaiStart, sheath: true, oneDashCancel: true, cleave: true,
     // 어려운 대신 강함: 링크 판정이 좁고(일찍 1프레임·늦게 2프레임), 완벽하면 대미지 1.35배 · 늦으면 0.85배
     link: { early: 1, late: 2, bonus: 1.35, stun: 3, sloppy: 0.85 }, draw: drawKai, idleArms: kaiIdleArms, guardArms: kaiGuardArms, offhand: kaiOffhand
+  },
+  AURA: {
+    id: 'AURA', name: 'AURA', title: 'JELLY TIDE', style: 'SUPPORT', role: 'SUPPORT', hp: 880, pitch: 1.5,
+    walk: 1.35, run: 2.6, jumpV: -5.5, grav: 0.31, airAcc: 0.26, dashMul: 1.0,
+    // 작은 체구 (다른 캐릭터의 약 85%), 머리는 상대적으로 큼
+    dim: { hipH: 9.4, thigh: 5.0, shin: 5.0, torso: 6.8, headR: 3.1, upper: 4.1, fore: 3.9, crouchH: 13, crouchTop: 14.4 },
+    mats: AURA_MATS, fx: { col: PAL.pink },
+    guard: { name: 'JELLY VEIL', just: 9, gauge: 95, bsMul: 0.9, push: 1.0, jgStagger: 20, arc: 1.1, zone: false },
+    moves: AURA_MOVES, draw: drawAura, idleArms: auraIdleArms, guardArms: auraGuardArms
   }
 };
-const CHAR_LIST = ['RAZE', 'ORIN', 'KAI'];
+// 역할: 딜러(공격↑ 안전성↓) · 탱커(안전성↑ 공격↓) · 서포터(회복·강화, 대신 약함) · 유틸(다인전 특화)
+//   대부분 전장 앞에서 근접전으로 싸우며, 취향대로 고르는 분류
+const ROLES = {
+  DEALER:  { ko: '딜러',   col: '#ff6a6a', out: 1.10, in: 1.06, desc: '공격력이 높지만 안전성이 낮음' },
+  TANK:    { ko: '탱커',   col: '#6ab0ff', out: 0.92, in: 0.88, desc: '버티는 힘이 강하지만 공격력이 낮음' },
+  SUPPORT: { ko: '서포터', col: '#ff9ad0', out: 0.88, in: 1.00, desc: '자신과 팀원을 회복·강화, 대신 약함' },
+  UTILITY: { ko: '유틸',   col: '#c8f07a', out: 1.00, in: 1.00, desc: '다인전 특화 · 다루기 굉장히 어려움' }
+};
+const roleOf = id => ROLES[(CHARS[id] || {}).role] || ROLES.UTILITY;
+const CHAR_LIST = ['RAZE', 'ORIN', 'KAI', 'AURA'];
+const UNIQUE_PICK_MIN = 8;   // 캐릭터가 8명 이상이 되면 팀 대전(2:2 · 4:4)에서 같은 캐릭터 중복 선택 불가
 
 // =====================================================================
 // 8. 파이터 (이동 + 전투 상태 머신 + 뼈대 리그/부위별 판정 + 마우스 조준)
@@ -4310,6 +4488,7 @@ class Fighter {
     if (this.jumpBuf > 0) this.jumpBuf--;
     if (this.dashBuf > 0) this.dashBuf--;
     if (this.bufT > 0 && --this.bufT === 0) this.buf = null;
+    if (this.buffT > 0) this.buffT--;
     if (this.def.noSkills) this.cd.s1 = this.cd.s2 = this.cd.s3 = 99999;   // 스킬 없음
     else for (const k in this.cd) if (this.cd[k] > 0) this.cd[k]--;
     if (this.frame - this.guardPressF > 40) this.spam = 0;
@@ -4686,6 +4865,10 @@ class Fighter {
 
   draw() {
     drawSprite(this.spr.cv, this.x, this.y);
+    if (this.buffT > 0) for (let i = 0; i < 4; i++) {           // 강화 버프: 몸 주변을 도는 핑크·연두 빛
+      const a = this.frame * 0.12 + i * PI / 2, r = 9;
+      R(snap(this.x + Math.cos(a) * r), snap(this.y - 13 + Math.sin(a) * r * 0.6), 1, 1, i % 2 ? '#d4f59a' : '#ff9ad0');
+    }
     const blink = (this.state === 'dash' || this.state === 'getup' || (this.state === 'attack' && this.invuln > 0)) && this.invuln > 0 && this.frame % 2 === 0;
     if (this.flash > 0 || blink) {
       g.globalAlpha = this.flash > 0 ? 0.7 : 0.4;
@@ -4915,6 +5098,8 @@ const Combat = {
     if (panic) dmg *= 1 + Math.min(0.6, 0.15 * Math.max(0, def.stunPresses - 1) + (def.stunHold >= 15 ? 0.3 : 0));
     if (e.crush) dmg *= BREAK_MUL; else if (e.counter) dmg *= COUNTER_MUL;
     if (e.dmgMul) dmg *= e.dmgMul;                                          // GRAZE: 대미지 소폭 감소
+    dmg *= roleOf(atk.def.id).out * roleOf(def.def.id).in;                    // 역할 보정 (딜러·탱커·서포터·유틸)
+    if (atk.buffT > 0) dmg *= 1.2; if (def.buffT > 0) dmg *= 0.9;            // 서포터 강화 버프
     dmg = Math.max(1, Math.round(dmg));
     def.hp = Math.max(0, def.hp - dmg);
     let stun = Math.round(hp.hitstun * Math.max(0.45, 1 - 0.07 * c));
@@ -5082,6 +5267,9 @@ function drawIcon(rows, x, y, col) {     // 7x5 아이콘 → EPX 14x10, 반 픽
 function drawFighterScaled(f, cx, footY, s) { drawSprite(f.spr.cv, cx, footY, s); }
 
 const SKILL_ICONS = {
+  AURA: { s1: ['..#....', '.#.....', '..##...', '...#...', '..#....'],
+          s2: ['..#.#..', '.#####.', '.#####.', '..###..', '...#...'],
+          s3: ['...#...', '..###..', '.#.#.#.', '...#...', '.#.#.#.'] },
   RAZE: { s1: ['#...#..', '.#...#.', '..#...#', '.#...#.', '#...#..'],
           s2: ['...#...', '..###..', '.#####.', '...#...', '...#...'],
           s3: ['#.#.#..', '.#.#.#.', '..#.#.#', '.#.#.#.', '#.#.#..'] },
@@ -5090,6 +5278,9 @@ const SKILL_ICONS = {
           s3: ['...#...', '...#...', '...#...', '#.###.#', '.#.#.#.'] }
 };
 const SKILL_ICONS_AIR = {
+  AURA: { s1: ['....#..', '...#...', '..###..', '.#.....', '#......'],
+          s2: ['..#.#..', '.#####.', '.#####.', '..###..', '...#...'],
+          s3: ['...#...', '..###..', '.#.#.#.', '...#...', '.#.#.#.'] },
   RAZE: { s1: ['....##.', '...##..', '..##...', '.##....', '##.....'],
           s2: ['...#...', '...#...', '.#.#.#.', '..###..', '...#...'],
           s3: ['.#.#.#.', '#.....#', '...#...', '#.....#', '.#.#.#.'] },
@@ -5100,6 +5291,7 @@ const SKILL_ICONS_AIR = {
 const CHAR_INFO = {
   RAZE: { ko: '근접 연타형', desc: '쌍단검과 돌진으로 몰아붙이는 그림자 결투가', stats: [['SPD', 5], ['RNG', 2], ['POW', 3], ['DEF', 2]] },
   ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] },
+  AURA: { ko: '해파리 서포터', desc: '등 뒤의 큰 해파리가 전기로 공격 · 회복과 강화로 팀을 돕는다', stats: [['SPD', 3], ['RNG', 3], ['POW', 2], ['DEF', 2]] },
   KAI: { ko: '일본도 평타형', desc: '스킬 없이 평타만! 상황·조준·순서마다 다른 평타 13종', stats: [['SPD', 4], ['RNG', 3], ['POW', 3], ['DEF', 3]] }
 };
 
@@ -5390,7 +5582,13 @@ class AI {
   threatPoint(o) { return predictThreat(o, this.me); }
   neutral(dist, fwd, back) {
     const me = this.me, o = me.opp, L = this.L, ch = me.def.id, cd = me.cd;
-    const pref = ch === 'ORIN' ? 40 : 20, dirOf = k => (k === 'r' ? 1 : -1);
+    const pref = ch === 'ORIN' ? 40 : ch === 'AURA' ? 26 : 20, dirOf = k => (k === 'r' ? 1 : -1);
+    if (ch === 'AURA' && me.onGround) {                              // 서포터: 다치면 회복, 가까우면 강화 + 밀쳐내기
+      const hurtAlly = alliesOf(me).some(a => a.hp / a.maxHp < 0.6 && Math.abs(a.x - me.x) < 90);
+      if (cd.s2 === 0 && hurtAlly && dist > 28 && this.roll(0.5)) { this.press('s2'); return; }
+      if (cd.s3 === 0 && dist < 36 && this.roll(0.12 + 0.15 * L.aggro)) { this.press('s3'); return; }
+      if (cd.s1 === 0 && dist < 34 && this.roll(0.2 * L.aggro)) { this.press('s1'); return; }
+    }
     this.run = false; this.moveDir = 0;
     if (o.state === 'down' || o.state === 'getup') { this.moveDir = dist > pref ? dirOf(fwd) : 0; return; }
     // 상대 사거리 안: 섣불리 움직이지 않고 상대 공격을 기다림 (타이밍 가드 준비)
@@ -6367,16 +6565,19 @@ const CharScene = {
       this.rects.push({ x, y, w, h });
       panel(x, y, w, h, 0.9, sel ? (this.t % 20 < 14 ? PAL.yellow : PAL.orange) : PAL.indigo);
       if (Game.p1Char === id) drawText('NOW', x + w - 4, y + 4, PAL.green, { align: 'right' });
-      drawFighterScaled(this.prev[i], x + 22, y + 62, 2);
-      R(x + 6, y + 63, 32, 1.5, SIDE_COL[0]);
-      const tx = x + 44;
+      const small = n > 3, ps = small ? 1.7 : 2, px = small ? x + 17 : x + 22, tx = small ? x + 34 : x + 44, rl = roleOf(id);
+      drawFighterScaled(this.prev[i], px, y + 62, ps);
+      R(px - 14, y + 63, 28, 1.5, SIDE_COL[0]);
       drawText(d.name, tx, y + 8, sel ? PAL.white : PAL.lgray, { scale: 2 });
-      drawText(d.title, tx, y + 22, SIDE_COL[0]);
-      kText(info.ko, tx, y + 31, PAL.yellow, { size: 10 });
-      drawText(d.style, tx, y + 45, PAL.gray);
+      R(tx - 1, y + 21, 26, 11, '#141628'); rectLine(tx - 1, y + 21, 26, 11, rl.col);
+      kText(rl.ko, tx + 12, y + 22, rl.col, { align: 'center', size: 10 });
+      if (!small) drawText(d.title, tx + 30, y + 24, SIDE_COL[0]);
+      if (!small) kText(info.ko, tx, y + 36, PAL.yellow, { size: 10 });
+      else drawText(d.style, tx, y + 38, PAL.gray);
     });
-    const id = CHAR_LIST[this.sel], d = CHARS[id], info = CHAR_INFO[id], y = 88;
-    panel(8, y, VW - 16, 50, 0.9, PAL.indigo);
+    const id = CHAR_LIST[this.sel], d = CHARS[id], info = CHAR_INFO[id], y = 88, rl = roleOf(id);
+    panel(8, y, VW - 16, 50, 0.9, rl.col);
+    drawText(d.title, VW - 14, y + 6, SIDE_COL[0], { align: 'right' });
     info.stats.forEach(([k, v], j) => {
       const sy = y + 6 + j * 10;
       drawText(k, 16, sy, PAL.lgray);
@@ -6389,7 +6590,8 @@ const CharScene = {
       const sy = y + 6 + j * 10;
       drawText(k, 84, sy, PAL.yellow); drawText(nm, 104, sy, PAL.white);
     });
-    kText(CHAR_INFO[CHAR_LIST[this.sel]].desc, VW / 2, 142, PAL.cyan, { align: 'center' });
+    kText(CHAR_INFO[CHAR_LIST[this.sel]].desc, VW / 2, 140, PAL.cyan, { align: 'center', size: 10 });
+    const rlx = roleOf(CHAR_LIST[this.sel]); kText('[' + rlx.ko + '] ' + rlx.desc, VW / 2, 152, rlx.col, { align: 'center', size: 10 });
     kText('A/D 선택   ENTER 결정   ESC 뒤로', VW / 2, VH - 15, PAL.gray, { align: 'center' });
   }
 };
@@ -6650,6 +6852,18 @@ const OnlineScene = {
     this.bindNet();
   },
   get cap() { return this.size * 2; },
+  // 캐릭터가 8명 이상이면 2:2 · 4:4에서 같은 캐릭터 중복 불가
+  uniqueRule() { return this.size > 1 && CHAR_LIST.length >= UNIQUE_PICK_MIN; },
+  takenBy(ch, exceptId) { return this.players.some(p => p.id !== exceptId && p.char === ch); },
+  freeChar(want, exceptId) {
+    if (!this.uniqueRule() || !this.takenBy(want, exceptId)) return want;
+    return CHAR_LIST.find(c => !this.takenBy(c, exceptId)) || want;
+  },
+  fixDupes() {                                                       // 먼저 들어온 사람의 캐릭터를 유지, 나중 사람만 바꿈
+    if (!this.uniqueRule()) return;
+    const seen = [];
+    for (const p of this.players) { if (seen.includes(p.char)) p.char = CHAR_LIST.find(c => !seen.includes(c) && !this.players.some(q => q !== p && q.char === c)) || p.char; seen.push(p.char); }
+  },
   me() { return this.players.find(p => p.id === Net.myId); },
   teamCount(t) { return this.players.filter(p => p.team === t).length; },
   // 방장: 상태를 모두에게 알림
@@ -6669,11 +6883,11 @@ const OnlineScene = {
         let nick = cleanNick(m.nick) || 'PLAYER';
         if (this.players.some(p => p.nick === nick)) nick = (nick.slice(0, 6) + (this.players.length + 1));
         const team = this.teamCount(0) <= this.teamCount(1) ? 0 : 1;
-        this.players.push({ id: from, nick, char: CHARS[m.char] ? m.char : 'RAZE', team });
+        this.players.push({ id: from, nick, char: this.freeChar(CHARS[m.char] ? m.char : 'RAZE', from), team });
         if (this.players.length > this.cap) this.size = this.players.length > 4 ? 4 : this.players.length > 2 ? 2 : 1;
         SFX.play('blip'); this.broadcast();
         Net.send({ t: 'ping', a: performance.now() }, from);
-      } else if (m.t === 'setChar') { const p = this.players.find(q => q.id === from); if (p && CHARS[m.char]) { p.char = m.char; this.broadcast(); } }
+      } else if (m.t === 'setChar') { const p = this.players.find(q => q.id === from); if (p && CHARS[m.char]) { if (this.uniqueRule() && this.takenBy(m.char, from)) Net.send({ t: 'err', msg: '이미 다른 사람이 고른 캐릭터입니다' }, from); else p.char = m.char; this.broadcast(); } }
       else if (m.t === 'swap') { const p = this.players.find(q => q.id === from); if (p) { this.swapTeam(p); } }
       else if (m.t === 'back') this.broadcast();
       else if (m.t === 'pong') this.rtt[from] = performance.now() - m.a;
@@ -6700,7 +6914,7 @@ const OnlineScene = {
   },
   setSize(n) {
     if (this.players.length > n * 2) { this.err = '사람이 너무 많아 ' + n + ':' + n + '로 바꿀 수 없습니다'; return; }
-    this.size = n;
+    this.size = n; this.fixDupes();
     // 팀 인원이 넘치면 다른 팀으로 옮김
     for (const t of [0, 1]) while (n > 1 && this.teamCount(t) > n) this.players.filter(p => p.team === t).pop().team = 1 - t;
     SFX.play('blip'); this.broadcast();
@@ -6732,7 +6946,11 @@ const OnlineScene = {
       for (let k = 0; k < this.size; k++) {
         const p = ps[k];
         if (p) slots.push({ nick: p.nick, char: p.char, team: t, owner: p.id, human: true });
-        else slots.push({ nick: 'CPU ' + (++cpu), char: CHAR_LIST[Math.floor(Math.random() * CHAR_LIST.length)], team: t, owner: 'H', human: false });
+        else {
+          const used = slots.map(x => x.char).concat(this.players.map(x => x.char));
+          const pool = this.uniqueRule() ? CHAR_LIST.filter(c => !used.includes(c)) : CHAR_LIST;
+          slots.push({ nick: 'CPU ' + (++cpu), char: (pool.length ? pool : CHAR_LIST)[Math.floor(Math.random() * (pool.length || CHAR_LIST.length))], team: t, owner: 'H', human: false });
+        }
       }
     }
     // 중계를 거치므로 (참가자 → 방장 → 참가자) 가장 느린 사람 기준 왕복 시간만큼 지연
@@ -6799,15 +7017,18 @@ const OnlineScene = {
         R(r.x, r.y, r.w, r.h, hov ? PAL.indigo : mine ? '#24284e' : PAL.night);
         kText(p.nick + (p.id === 'H' ? ' ★' : ''), r.x + 3, y + 1, mine ? PAL.yellow : PAL.white, { size: 10 });
         drawText(p.char, r.x + 4, y + 12, PAL.lgray);
+        const rl = roleOf(p.char); kText(rl.ko, r.x + 6 + textWidth(p.char), y + 10, rl.col, { size: 9 });
         if (host && p.id !== 'H' && this.rtt[p.id]) drawText(Math.round(this.rtt[p.id]) + 'MS', r.x + r.w - 3, y + 12, PAL.gray, { align: 'right' });
         if (can) this.btns.push({ ...r, fn: () => { if (host) this.swapTeam(p); else Net.send({ t: 'swap' }); } });
       }
     }
-    if (this.size > 1) kText(host ? '이름을 누르면 팀 이동' : '내 이름을 누르면 팀 이동', 207, 129, PAL.gray, { align: 'center', size: 10 });
+    if (this.size > 1) kText((host ? '이름을 누르면 팀 이동' : '내 이름을 누르면 팀 이동') + (this.uniqueRule() ? ' · 캐릭터 중복 불가' : ''), 207, 129, PAL.gray, { align: 'center', size: 10 });
     // 아래 버튼
     const me = this.me();
     btn(100, 142, 70, 16, '캐릭터: ' + (me ? me.char : Game.p1Char), () => {
-      Game.p1Char = cycle(CHAR_LIST, Game.p1Char, 1);
+      let c = cycle(CHAR_LIST, Game.p1Char, 1);
+      if (this.uniqueRule()) for (let i = 0; i < CHAR_LIST.length && this.takenBy(c, Net.myId); i++) c = cycle(CHAR_LIST, c, 1);   // 남이 고른 캐릭터는 건너뜀
+      Game.p1Char = c;
       if (host) { me.char = Game.p1Char; this.broadcast(); } else Net.send({ t: 'setChar', char: Game.p1Char });
     });
     if (host) {
@@ -7485,7 +7706,8 @@ const TeamSetupScene = () => menuScene('팀 대전 (CPU)', '넓은 맵 · 가장
   { label: '내 캐릭터', value: () => Game.p1Char, change: d => { Game.p1Char = cycle(CHAR_LIST, Game.p1Char, d); } },
   { label: 'AI 난이도', value: () => LEVEL_KO[Game.level], change: d => { Game.level = cycle(LEVELS, Game.level, d); } },
   { label: '대전 시작', action: () => {
-    const n = Game.teamSize, slots = [], rc = () => CHAR_LIST[Math.floor(Math.random() * CHAR_LIST.length)];
+    const n = Game.teamSize, slots = [], uniq = CHAR_LIST.length >= UNIQUE_PICK_MIN;
+    const rc = () => { const pool = uniq ? CHAR_LIST.filter(c => !slots.some(x => x.char === c)) : CHAR_LIST; const p = pool.length ? pool : CHAR_LIST; return p[Math.floor(Math.random() * p.length)]; };
     slots.push({ nick: Game.nick, char: Game.p1Char, team: 0, human: true });
     for (let i = 1; i < n; i++) slots.push({ nick: '아군 ' + i, char: rc(), team: 0 });
     for (let i = 0; i < n; i++) slots.push({ nick: '적 ' + (i + 1), char: rc(), team: 1 });
