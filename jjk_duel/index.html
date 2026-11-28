@@ -3000,7 +3000,7 @@ const UNIT_DATA=[
 ['naobito','젠인 나오비토','특별 1급 주술사',5,'速',22,SK('투사주법 연타','one',3,{hits:3}),SK('초고속 쇄도','wait',6)],
 ['ino','이노 타쿠마','준1급 주술사',4,'獣',20,SK('내방서수: 해태','one',6),SK('내방서수: 용','all',4)],
 ['gojo','고죠 사토루','특급 주술사',6,'蒼',36,SK('술식 순전: 창','one',9),SK('술식 반전: 혁','all',6),UL('영역 전개 - 무량공처','all',12,['s_eyes'],['m_rct','m_veil'],{seal:1,stun:2})],
-['yuta','옷코츠 유타','특급 주술사',6,'愛',32,SK('주력 검격','one',8),SK('주언: 죽어라','all',5),UL('순애포 (리카 완전 현현)','all',10,['s_rika'],['m_rct','m_black'],{heal:12})],
+['yuta','옷코츠 유타','특급 주술사',6,'愛',32,SK('주력 검격','one',8),SK('주언: 죽어라','all',5),UL('순애포','all',10,['s_rika'],['m_rct','m_black'],{heal:12})],
 ['geto','게토 스구루','특급 주저사',6,'渦',30,SK('주령 사출','one',7),SK('주령 떼 해방','rand',3,{hits:5}),UL('극번 - 소용돌이','one',22,['fly','centi','grass'],['m_uzu','m_veil'],{pierce:1})],
 ['tsukumo','츠쿠모 유키','특급 주술사',6,'星',30,SK('봄바예: 질량 펀치','one',9),SK('가루다 차기','all',4),UL('블랙홀','all',14,['s_garuda'],['m_black','m_rct'],{self:8})],
 ['sukuna','료멘 스쿠나','저주의 왕',6,'宿',38,SK('해(解)','one',9),SK('팔(八)','rand',4,{hits:4}),UL('영역 전개 - 복마어주자','all',12,['uraume'],['m_finger','m_veil'],{pierce:1,ignoreProt:1})],
@@ -3096,6 +3096,8 @@ const ULT2={
  geto:UL('백귀야행','rand',10,['fly','centi','grass'],['m_black','m_simple'],{hits:3,pierce:1}),
  jogo:UL('극번 「운」','all',13,['kaizo','fly'],['m_uzu','m_simple'],{pierce:1}),
  mahito:UL('편살즉영체','one',12,['kaizo'],['m_black','m_vow'],{transform:1}),
+ yuta:UL('리카 완전 현현','all',8,['s_rika'],['m_vow','m_veil'],{transform:1}),
+ toji:UL('천역모 관통','one',24,['s_tenten'],['m_vow','m_veil'],{pierce:1,ignoreProt:1}),
 };
 for(const id in ULT2)if(CARDS[id])CARDS[id].ult2=ULT2[id];
 const ultsOf=C=>[C.ult&&{k:'u',U:C.ult,f:'ul'},C.ult2&&{k:'u2',U:C.ult2,f:'ul2'}].filter(Boolean);
@@ -3534,7 +3536,7 @@ function doAttack(a,k,tgt){
   const parts=[];if(st.atk)parts.push(`타격당 피해 +${st.atk}`);if(st.red)parts.push(`받는 피해 -${st.red}`);
   log(`${sl.map(x=>'「'+x.s.n+'」').join(' ')} 시너지 협공! ${parts.join(', ')}`,a,'ult');}}
  const o={pierce:s.pierce||subFx(A).pierce,ignoreProt:s.ignoreProt};
- if(s.transform){u.hp=u.mhp;u.b+=4;fx({k:'heal',s:a,u:u.u,v:u.mhp});fx({k:'txt',s:a,u:u.u,t:'편살즉영체',c:'unlock'});log(`[${cn(u)}] 편살즉영체! 체력 완전 회복 + 공격력 영구 +4`,a,'ult');}
+ if(s.transform){u.hp=u.mhp;u.b+=4;fx({k:'heal',s:a,u:u.u,v:u.mhp});fx({k:'txt',s:a,u:u.u,t:s.n,c:'unlock'});log(`[${cn(u)}] ${s.n}! 체력 완전 회복 + 공격력 영구 +4`,a,'ult');}
  if(s.jackpot){u.hp=u.mhp;u.b+=4;fx({k:'txt',s:a,u:u.u,t:'JACKPOT!!',c:'unlock'});log(`대박! [${cn(u)}] 체력 완전 회복 + 공격력 영구 +4`,a,'ult');}
  const hits=s.hits||1;let total=0;
  if(s.t==='one'){
