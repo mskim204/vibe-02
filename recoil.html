@@ -3856,9 +3856,10 @@ function drawHumanBase(R0, f, J, o) {
   R.cap(J.shB, J.elB, 1.0, 0.84, o.top, G.aB, true);
   R.cap(J.elB, J.hB, 0.8, 0.68, sleeve, G.aB, true);
   baseHand(R, J.elB, J.hB, G.aB);
+  if (o.handDeco) o.handDeco(R0, J.elB, J.hB, G.aB);
   if (o.weaponBack) o.weaponBack(R0, J, G.wB);
   R.cap(J.hipB, J.knB, 1.45, 1.1, o.bottom, G.lB, true);
-  R.cap(J.knB, J.anB, 1.08, 0.78, o.bottom, G.lB, true);
+  R.cap(J.knB, J.anB, 1.08, 0.78, o.shin || o.bottom, G.lB, true);
   R.cap(J.anB, vadd(J.anB, o.foot ? o.foot(f) : V(1.9, 0.25)), 0.76, 0.6, o.shoe, G.lB, true);
   R.back = 0;
   // 몸통: 어깨 → 잘록한 허리 → 골반
@@ -3869,7 +3870,7 @@ function drawHumanBase(R0, f, J, o) {
   if (o.belt) R.poly([vadd(vadd(hip, u, 0.4), n, -1.95), vadd(vadd(hip, u, 0.4), n, 1.85), vadd(vadd(hip, u, 1.3), n, 1.75), vadd(vadd(hip, u, 1.3), n, -1.85)], o.belt, G.belt, false);
   // 앞다리
   R.cap(J.hipF, J.knF, 1.5, 1.14, o.bottom, G.lF, true);
-  R.cap(J.knF, J.anF, 1.12, 0.8, o.bottom, G.lF, true);
+  R.cap(J.knF, J.anF, 1.12, 0.8, o.shin || o.bottom, G.lF, true);
   R.cap(J.anF, vadd(J.anF, o.foot ? o.foot(f) : V(1.9, 0.25)), 0.78, 0.62, o.shoe, G.lF, true);
   // 목 · 깃
   R.cap(vadd(neck, u, 0.2), vadd(head, hu, -2.6), 0.85, 0.8, 'skin', G.neck, true);
@@ -3885,6 +3886,7 @@ function drawHumanBase(R0, f, J, o) {
   R.cap(J.shF, J.elF, 1.05, 0.88, o.top, G.aF, true);
   R.cap(J.elF, J.hF, 0.84, 0.7, sleeve, G.aF, true);
   baseHand(R, J.elF, J.hF, G.aF);
+  if (o.handDeco) o.handDeco(R0, J.elF, J.hF, G.aF);
   if (o.front) o.front(R0, f, J);
 }
 // KAI: 베이스 체형 + 수수한 갈색 옷 + 짧은 갈색 머리 + 일본도
@@ -4283,6 +4285,205 @@ const AURA_MOVES = {
   R: AURA_BLESS_MOVE(false), aR: AURA_BLESS_MOVE(true)
 };
 
+// ---------------------------------------------------------------------
+// DRAKO — 인간형 드래곤 (딜러): 두 개의 뿔 · 날개 · 꼬리 · 비늘 · 손톱
+//   옷 대신 살짝 긴 갈색 띠를 몸에 둘러 감음
+//   평타는 손톱 할퀴기, 스킬은 꼬리 휘두르기 / 짧은 화염 숨결 / 손톱 난무
+//   딜러: 공격력이 높은 대신 체력·가드가 약함 (근접전)
+// ---------------------------------------------------------------------
+const DRAKO_MATS = buildMats({
+  skin:  ['#f6cfae', '#e0a27c', '#b87050', '#4a2418'],
+  scale: ['#ff9478', '#d0443a', '#8a2230', '#2a0810'],
+  wing:  ['#e86a6a', '#a8303c', '#6e1a2a', '#22060c'],
+  band:  ['#d2a272', '#a4703f', '#734a26', '#26160a'],
+  horn:  ['#fff6e0', '#e2d0a6', '#a8926a', '#3a2c16'],
+  hair:  ['#a83a3a', '#6e1e26', '#481218', '#16040a'],
+  claw:  ['#ffffff', '#f4ecd8', '#c8b894', '#4a3a24'],
+  fire:  ['#fffbd0', '#ffd23d', '#ff8a3d', '#c03a1c'],
+  smear: ['#ffffff', '#ffe2d6', '#ff9a7a', '#d03a3a']
+});
+// 꼬리: 엉덩이 뒤에서 아래·뒤로 늘어져 흔들림 (꼬리 휘두르기 중엔 앞으로 크게 휩쓺)
+function drawDrakoTail(R, f, J) {
+  const t = f.frame, base = vadd(vadd(J.hip, J.n, -1.7), J.u, 0.8);
+  let ang = PI * 0.62 + Math.sin(t * 0.07) * 0.1, curl = -0.16;          // 뒤·아래로 늘어졌다가 끝이 살짝 말려 올라감
+  if (f.state === 'attack' && f.move && f.move.tail) {
+    const m = f.move, k = f.moveK, ph = f.phaseOf(k);
+    const p = ph === 's' ? 0 : ph === 'a' ? (k - m.startup + 1) / m.active : 1 - Math.min(1, (k - m.startup - m.active) / Math.max(1, m.recovery));
+    ang = PI * 0.85 - 2.6 * Math.min(1, p * 1.1); curl = -0.05;          // 뒤 → 아래 → 앞으로 휩쓺
+  }
+  let p = base, w = 1.35;
+  for (let i = 0; i < 7; i++) {
+    const a = ang + curl * i + Math.sin(t * 0.09 - i * 0.6) * 0.05;
+    let q = vadd(p, dirOf(a), 2.1);
+    if (q.y > -0.4) q = V(q.x, -0.4);                              // 바닥 아래로 내려가지 않게
+    R.cap(p, q, w, w - 0.14, 'scale', 1, false);
+    if (i % 2 === 0) R.dot(vadd(p, V(0, -w + 0.2)), '#ff9478');    // 등줄기 비늘
+    p = q; w -= 0.14;
+  }
+  R.poly([vadd(p, V(-1.2, -0.8)), vadd(p, V(1.8, 0.2)), vadd(p, V(-0.6, 1.4))], 'scale', 1, false);   // 꼬리 끝
+}
+// 날개: 어깨 뒤에서 위·뒤로 (평소엔 반쯤 접힘, 공중·공격 땐 펼침)
+function drawDrakoWing(R, f, J, far) {
+  const air = !f.onGround, atk = f.state === 'attack', t = f.frame;
+  const open = air ? 1 : atk ? 0.8 : f.state === 'run' || f.state === 'dash' ? 0.6 : 0.3;
+  const flap = air ? Math.sin(t * 0.35) * 0.35 : Math.sin(t * 0.06) * 0.06;
+  const root = vadd(vadd(J.neck, J.u, -2.2), J.n, -1.2 + (far ? 0.6 : 0));
+  const a0 = -PI * 0.5 - 0.55 - open * 0.45 + flap + (far ? 0.12 : 0);     // 위·뒤로 뻗는 날개 뼈
+  const elbow = vadd(root, dirOf(a0), 5.5 + open * 2.5);
+  const tip = vadd(elbow, dirOf(a0 - 0.5 - open * 0.3), 4 + open * 3);
+  const f1 = vadd(elbow, dirOf(a0 + 1.1 + open * 0.3), 5 + open * 4);      // 날개막 끝점들
+  const f2 = vadd(elbow, dirOf(a0 + 1.9), 4 + open * 3);
+  const gp = 1, low = vadd(root, J.u, -3);
+  R.poly([elbow, tip, f1], 'wing', gp, false);                    // 날개막 (볼록한 조각들로)
+  R.poly([elbow, f1, f2], 'wing', gp, false);
+  R.poly([root, elbow, f2, low], 'wing', gp, false);
+  R.cap(root, elbow, 0.55, 0.45, 'scale', gp, false);
+  R.cap(elbow, tip, 0.42, 0.25, 'scale', gp, false);
+  R.cap(elbow, f1, 0.3, 0.18, 'scale', gp, false);
+  R.cap(elbow, f2, 0.28, 0.16, 'scale', gp, false);
+  R.ell(elbow, 0.6, 0.6, 0, 'horn', gp, false);
+}
+// 손톱 할퀸 자국: 평행한 세 줄 (공격 판정과 같은 호 위)
+function drawClawMarks(R, J) {
+  const s = J.smear, S = J.shF;
+  if (!s || s.type !== 'arc') return;
+  const sg = Math.sign(s.a1 - s.a0) || 1, a0 = s.a1 - sg * 1.0;          // 지나온 궤적을 길게 (휘두른 방향으로 꼬리를 끄는 세 줄)
+  for (let k = 0; k < 3; k++) {
+    const r = s.r1 - 0.6 - k * 2.0, n = 6;
+    for (let i = 0; i < n; i++) {
+      const a = lerp(a0, s.a1, i / n), b = lerp(a0, s.a1, (i + 1) / n);
+      R.cap(vadd(S, dirOf(a), r), vadd(S, dirOf(b), r), 0.32, 0.32, 'smear', 14, false);
+    }
+  }
+}
+// 화염 숨결: 입에서 조준 방향으로 퍼지는 불꽃
+function drawBreath(R, f, J) {
+  if (!(f.state === 'attack' && f.move && f.move.breath)) return;
+  const m = f.move, k = f.moveK, ph = f.phaseOf(k);
+  const mouth = vadd(vadd(J.head, J.hn, 2.4), J.hu, -1.2), dv = dirOf(f.moveAim);
+  if (ph === 's') { R.ell(vadd(mouth, dv, 1), 0.9, 0.9, 0, 'fire', 14, false); return; }
+  if (ph !== 'a') return;
+  const len = Math.min(1, (k - m.startup + 3) / 6) * m.shape.r1;
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6, w = 0.8 + t * 3.2 + Math.sin(f.frame * 0.9 + i) * 0.4;
+    const c = vadd(vadd(mouth, dv, 2 + t * len), V(-dv.y, dv.x), Math.sin(f.frame * 0.7 + i * 1.7) * t * 1.6);
+    R.ell(c, w, w * 0.8, 0, 'fire', 14, false);
+  }
+}
+const DRAKO_LOOK = {
+  top: 'skin', sleeve: 'scale', bottom: 'skin', shin: 'scale', shoe: 'scale', noSmear: true,
+  behind(R, f, J) { drawDrakoWing(R, f, J, true); drawDrakoTail(R, f, J); drawDrakoWing(R, f, J, false); },
+  // 옷 대신 두른 갈색 띠: 가슴을 비스듬히 감고, 허리를 감은 뒤 앞뒤로 살짝 길게 늘어짐
+  belted(R, J, gp) {
+    const { hip, neck, u, n } = J;
+    const band = (a, b, w) => { const d = V(b.x - a.x, b.y - a.y), L = Math.hypot(d.x, d.y) || 1, p = V(-d.y / L * w, d.x / L * w);
+      R.poly([vadd(a, p), vadd(b, p), vadd(b, p, -1), vadd(a, p, -1)], 'band', gp, true); };
+    band(vadd(vadd(neck, n, -2.0), u, -0.8), vadd(vadd(hip, n, 1.7), u, 3.8), 0.75);          // 어깨 → 반대쪽 옆구리
+    band(vadd(vadd(neck, n, 1.9), u, -1.6), vadd(vadd(hip, n, -1.6), u, 4.4), 0.6);
+    R.poly([vadd(vadd(hip, u, 1.6), n, -2.1), vadd(vadd(hip, u, 1.6), n, 2.0), vadd(vadd(hip, u, -1.2), n, 2.1), vadd(vadd(hip, u, -1.4), n, -2.2)], 'band', gp, true);   // 허리 감기
+    const sw = Math.sin(J.lean * 3) * 0.4;
+    R.poly([vadd(vadd(hip, u, -0.8), n, 0.6), vadd(vadd(hip, u, -0.8), n, 1.9), vadd(vadd(hip, u, -6.2), n, 1.6 + sw), vadd(vadd(hip, u, -6.0), n, 0.5 + sw)], 'band', gp, true);   // 앞 자락
+    R.poly([vadd(vadd(hip, u, -0.6), n, -1.9), vadd(vadd(hip, u, -0.6), n, -0.6), vadd(vadd(hip, u, -5.4), n, -1.2 - sw), vadd(vadd(hip, u, -5.6), n, -2.4 - sw)], 'band', gp, true);   // 뒤 자락
+  },
+  hairStyle(R, J, gp) {
+    const { head, hu, hn } = J;
+    // 짧고 뻗친 붉은 머리
+    R.ell(vadd(vadd(head, hu, 1.7), hn, -0.6), 2.5, 1.6, J.ht, 'hair', gp, false);
+    R.cap(vadd(vadd(head, hu, 2.0), hn, -1.6), vadd(vadd(head, hu, 2.4), hn, -3.8), 0.8, 0.2, 'hair', gp, false);
+    R.cap(vadd(vadd(head, hu, 1.0), hn, -2.3), vadd(vadd(head, hu, 0.2), hn, -4.0), 0.7, 0.2, 'hair', gp, false);
+    R.cap(vadd(vadd(head, hu, 1.6), hn, 1.4), vadd(vadd(head, hu, 0.8), hn, 2.6), 0.6, 0.2, 'hair', gp, false);
+    // 두 개의 뿔: 이마 위에서 뒤로 휘어짐 (먼 쪽 뿔은 살짝 뒤에)
+    for (const [off, s] of [[-1.0, 0.85], [0.5, 1]]) {
+      const b = vadd(vadd(head, hu, 2.2), hn, off), m = vadd(vadd(b, hu, 2.4 * s), hn, -1.2 * s), tip = vadd(vadd(m, hu, 1.2 * s), hn, -2.4 * s);
+      R.cap(b, m, 0.75 * s, 0.5 * s, 'horn', gp, false);
+      R.cap(m, tip, 0.5 * s, 0.12, 'horn', gp, false);
+    }
+    R.dot(vadd(vadd(head, hu, 0.2), hn, 1.75), '#ffd23d');           // 금빛 눈
+    R.dot(vadd(vadd(head, hu, -0.7), hn, -0.2), '#d0443a'); R.dot(vadd(vadd(head, hu, -1.1), hn, -0.6), '#d0443a');   // 뺨의 비늘
+  },
+  // 손톱: 손끝에서 뻗은 세 개의 하얀 발톱
+  handDeco(R, el, hand, gp) {
+    const a = Math.atan2(hand.y - el.y, hand.x - el.x);
+    for (const d of [-0.45, 0, 0.45]) R.cap(vadd(hand, dirOf(a + d), 0.8), vadd(hand, dirOf(a + d * 1.3), 2.6), 0.28, 0.08, 'claw', gp, false);
+  },
+  front(R, f, J) { drawClawMarks(R, J); drawBreath(R, f, J); }
+};
+function drawDrako(R, f, J) { drawHumanBase(R, f, J, DRAKO_LOOK); }
+// 맹수 자세: 양손 손톱을 앞으로 세움
+function drakoIdleArms(f, J, a) {
+  const S = J.shF, B = J.shB, br = Math.sin(f.animT * 0.1) * 0.35;
+  if (a === 'run' || a === 'dash') return { hF: vadd(S, V(-3.0, 3.4)), wAng: 0, hB: vadd(B, V(-3.6, 2.6)), wAngB: 0 };
+  if (a === 'jump' || a === 'fall') return { hF: vadd(S, V(3.4, -1.4)), wAng: 0, hB: vadd(B, V(2.0, 0.4)), wAngB: 0 };
+  return { hF: vadd(S, V(4.0, 2.2 + br)), wAng: 0, hB: vadd(B, V(3.0, 3.4 + br)), wAngB: 0 };
+}
+function drakoGuardArms(f, J, ga) {
+  const S = J.shF, gd = dirOf(ga), pv = V(-gd.y, gd.x);
+  return { hF: vadd(vadd(S, gd, 5.0), pv, -1.4), wAng: ga, hB: vadd(vadd(S, gd, 4.4), pv, 1.4), wAngB: ga };
+}
+function drakoOffhand(f, J, o) { if (o.attacking && !o.keepB) { o.hB = vadd(J.shB, V(-2.0, 3.6)); o.wAngB = 0; } }
+const tailArms = (f, J) => ({ hF: vadd(J.shF, V(-1.5, 3.5)), wAng: 0, hB: vadd(J.shB, V(-2.5, 3.2)), wAngB: 0, attacking: true });
+// 스킬 (지상·공중 공용 생성기)
+const DRAKO_TAIL = air => ({ name: 'TAIL WHIP', skill: 's1', cd: 360, air, landCancel: air, tail: true, startup: 6, active: 6, recovery: 14, whiffRecoil: 0, whiffExtra: 10,
+  shape: { type: 'area0', x: -24, y: -16, w: 48, h: 15 }, arms: tailArms,                  // 앞뒤 낮게 한 바퀴 → 넘어뜨림
+  hit: { dmg: 34, hitstun: 26, blockstun: 12, kb: 2.2, kbY: -2.6, knockdown: true, hitstop: 8, shake: 2, guardDmg: 16, blockPush: 2.2, chip: 0.1, kbDir: 'out' },
+  body(f, P, k, ph) { if (ph !== 's') { P.lean = 0.6; P.tilt = -0.4; P.hipY += 1.5; } },
+  onFrame(f, k) { if (!f.onGround) { f.vy = Math.min(f.vy, 0.6); } return false; } });
+const DRAKO_BREATH = air => ({ name: 'FLAME BREATH', skill: 's2', cd: 540, air, breath: true, startup: 9, active: 16, recovery: 16, hitEvery: 4, whiffRecoil: 0.6, whiffExtra: 10,
+  shape: { type: 'thrust', r0: 6, r1: 24, size: 6, noSmear: true },                         // 짧은 거리 화염 (근접전)
+  hit: { dmg: 12, hitstun: 16, minStun: 12, blockstun: 9, kb: 0.9, hitstop: 3, guardDmg: 10, blockPush: 0.8, chip: 0.15 },
+  finisher: { dmg: 22, hitstun: 24, kb: 2.4, kbY: -1.8, hitstop: 7, shake: 2 },
+  arms(f, J) { return { hF: vadd(J.shF, V(2.0, 3.0)), wAng: 0, hB: vadd(J.shB, V(1.4, 3.4)), wAngB: 0, attacking: true }; },
+  onFrame(f, k) {
+    const m = f.move;
+    if (k >= m.startup && k < m.startup + m.active && k % 2 === 0) {
+      const c = f.chest(), d = f.aimWorldDir(f.moveAim);
+      FX.parts.push({ x: c.x + d.x * 16, y: c.y + d.y * 16 - 2, vx: d.x * 1.2, vy: d.y * 1.2 - 0.5, g: -0.05, life: 12, s: 1, c: k % 4 ? PAL.orange : PAL.yellow });
+    }
+    if (!f.onGround) f.vy = Math.min(f.vy, 0.5);
+    return false;
+  } });
+const DRAKO_RAMPAGE = air => ({ name: 'CLAW RAMPAGE', skill: 's3', cd: 900, air, startup: 6, active: 24, recovery: 18, hitEvery: 4, whiffRecoil: 2, whiffExtra: 16,
+  shape: { type: 'area', dist: 10, w: 20, h: 22 },
+  hit: { dmg: 11, hitstun: 14, minStun: 12, blockstun: 8, kb: 0.5, hitstop: 3, guardDmg: 9, blockPush: 0.6, chip: 0.1 },
+  finisher: { dmg: 40, hitstun: 30, kb: 3.6, kbY: -3.2, knockdown: true, hitstop: 13, shake: 4, guardDmg: 24, blockPush: 3 },
+  arms(f, J, idle, reach, k, ph) {                              // 양손 손톱을 번갈아 휘두르며 돌진
+    const m = f.move, S = J.shF, a = f.moveAim;
+    if (ph !== 'a') return { hF: vadd(S, V(-2, 2)), wAng: 0, attacking: true };
+    const grp = Math.floor((k - m.startup) / m.hitEvery), sub = ((k - m.startup) % m.hitEvery) / m.hitEvery, sg = grp % 2 ? 1 : -1;
+    const a0 = a - sg * 0.9, a1 = a + sg * 0.9, cur = lerp(a0, a1, sub + 0.2);
+    return { hF: vadd(S, dirOf(cur), reach * 0.95), wAng: cur, attacking: true, keepB: true, hB: vadd(J.shB, dirOf(a - sg * 0.6), reach * 0.8), wAngB: 0,
+      smear: { type: 'arc', a0: lerp(a0, a1, Math.max(0, sub - 0.25)), a1: cur, r0: 4, r1: 17 } };
+  },
+  onFrame(f, k) {
+    const m = f.move;
+    if (k >= m.startup && k < m.startup + m.active) { const d = dirOf(f.moveAim); f.vx = f.facing * d.x * ((f.moveHit || f.moveBlocked) ? 0.8 : 1.6); if (!f.onGround) { f.vy = d.y * 0.8; f.noGrav = true; } return true; }
+    return false;
+  } });
+const DRAKO_MOVES = {
+  N1: { name: 'CLAW SWIPE', normal: true, startup: 4, active: 3, recovery: 9, chain: 'N2', whiffRecoil: 1.6, whiffExtra: 8, lean: 0.35,
+    shape: { type: 'arc', from: -0.9, to: 0.6, r0: 4, r1: 17, size: 3.5 },
+    hit: { dmg: 30, hitstun: 16, blockstun: 10, kb: 1.4, hitstop: 5, guardDmg: 11, blockPush: 1.8 }, onFrame: stepForward(0.9) },
+  N2: { name: 'RAKE', normal: true, startup: 5, active: 3, recovery: 11, chain: 'N3', whiffRecoil: 1.8, whiffExtra: 8, lean: 0.3,
+    shape: { type: 'arc', from: 0.8, to: -0.7, r0: 4, r1: 17, size: 3.5 },                // 아래에서 위로 할퀴기
+    hit: { dmg: 32, hitstun: 17, blockstun: 11, kb: 1.6, hitstop: 5, guardDmg: 12, blockPush: 2 }, onFrame: stepForward(1.0) },
+  N3: { name: 'DRAGON MAUL', normal: true, startup: 7, active: 4, recovery: 16, whiffRecoil: 2.2, whiffExtra: 10, lean: 0.5,
+    shape: { type: 'arc', from: -1.3, to: 0.9, r0: 4, r1: 18, size: 4 },                 // 양손으로 크게 내려 할퀴며 띄움
+    hit: { dmg: 46, hitstun: 26, blockstun: 13, kb: 0.6, kbY: -4.6, hitstop: 8, shake: 2, guardDmg: 20, blockPush: 2.6 },
+    onFrame: stepForward(0.7) },
+  aN1: { name: 'AIR CLAW', normal: true, air: true, landCancel: true, chain: 'aN2', startup: 4, active: 4, recovery: 10, whiffRecoil: 0.5, whiffExtra: 6,
+    shape: { type: 'arc', from: -0.85, to: 0.85, r0: 4, r1: 16, size: 3.5 },
+    hit: { dmg: 32, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -1.8, hitstop: 5, guardDmg: 12, blockPush: 1.5 } },
+  aN2: { name: 'AIR RAKE', normal: true, air: true, landCancel: true, chain: 'aN3', startup: 4, active: 3, recovery: 10, whiffRecoil: 0.4, whiffExtra: 6,
+    shape: { type: 'arc', from: 0.9, to: -0.9, r0: 4, r1: 16, size: 3.5 },
+    hit: { dmg: 30, hitstun: 22, blockstun: 11, kb: 0.8, kbY: -2.3, hitstop: 5, guardDmg: 12, blockPush: 1.5 } },
+  aN3: { name: 'DIVE TALON', normal: true, air: true, landCancel: true, startup: 6, active: 4, recovery: 14, whiffRecoil: 0.4, whiffExtra: 8, aimClamp: [0.35, 1.45], lean: 0.5,
+    shape: { type: 'arc', from: -0.7, to: 0.8, r0: 4, r1: 17, size: 4 },
+    hit: { dmg: 44, hitstun: 24, blockstun: 13, kb: 2.0, spike: true, hitstop: 9, shake: 2, guardDmg: 18, blockPush: 2 } },
+  Q: DRAKO_TAIL(false), aQ: DRAKO_TAIL(true),
+  E: DRAKO_BREATH(false), aE: DRAKO_BREATH(true),
+  R: DRAKO_RAMPAGE(false), aR: DRAKO_RAMPAGE(true)
+};
+
 const CHARS = {
   RAZE: {
     id: 'RAZE', name: 'RAZE', title: 'SHADOW DAGGER', style: 'RUSHDOWN', role: 'DEALER', hp: 950,
@@ -4323,6 +4524,15 @@ const CHARS = {
     mats: AURA_MATS, fx: { col: PAL.pink },
     guard: { name: 'JELLY VEIL', just: 9, gauge: 95, bsMul: 0.9, push: 1.0, jgStagger: 20, arc: 1.1, zone: false },
     moves: AURA_MOVES, hover: true, draw: drawAura, idleArms: auraIdleArms, guardArms: auraGuardArms
+  },
+  DRAKO: {
+    id: 'DRAKO', name: 'DRAKO', title: 'CRIMSON CLAW', style: 'SAVAGE', role: 'DEALER', hp: 900, pitch: 0.85,
+    walk: 1.5, run: 2.9, jumpV: -5.8, grav: 0.32, airAcc: 0.27, dashMul: 1.05,
+    dim: { hipH: 11, thigh: 5.9, shin: 5.9, torso: 8, headR: 3.2, upper: 4.8, fore: 4.6, crouchH: 15, crouchTop: 16.2 },   // 베이스 체형
+    mats: DRAKO_MATS, fx: { col: PAL.orange },
+    // 딜러: 가드 게이지가 낮고 가드 각도도 좁음 (대신 공격이 강함)
+    guard: { name: 'SCALE GUARD', just: 9, gauge: 75, bsMul: 0.95, push: 1.1, jgStagger: 22, arc: 0.95, zone: false },
+    moves: DRAKO_MOVES, draw: drawDrako, idleArms: drakoIdleArms, guardArms: drakoGuardArms, offhand: drakoOffhand
   }
 };
 // 역할: 딜러(공격↑ 안전성↓) · 탱커(안전성↑ 공격↓) · 서포터(회복·강화, 대신 약함) · 유틸(다인전 특화)
@@ -4334,7 +4544,7 @@ const ROLES = {
   UTILITY: { ko: '유틸',   col: '#c8f07a', out: 1.00, in: 1.00, desc: '다인전 특화 · 다루기 굉장히 어려움' }
 };
 const roleOf = id => ROLES[(CHARS[id] || {}).role] || ROLES.UTILITY;
-const CHAR_LIST = ['RAZE', 'ORIN', 'KAI', 'AURA'];
+const CHAR_LIST = ['RAZE', 'ORIN', 'KAI', 'AURA', 'DRAKO'];
 const UNIQUE_PICK_MIN = 8;   // 캐릭터가 8명 이상이 되면 팀 대전(2:2 · 4:4)에서 같은 캐릭터 중복 선택 불가
 
 // =====================================================================
@@ -5280,6 +5490,9 @@ function drawIcon(rows, x, y, col) {     // 7x5 아이콘 → EPX 14x10, 반 픽
 function drawFighterScaled(f, cx, footY, s) { drawSprite(f.spr.cv, cx, footY - (f.lift || 0) * s, s); }
 
 const SKILL_ICONS = {
+  DRAKO: { s1: ['#......', '.#.....', '..##...', '....##.', '......#'],
+           s2: ['..#.#..', '.#.#.#.', '.#####.', '..###..', '...#...'],
+           s3: ['#.#.#.#', '.#.#.#.', '#.#.#.#', '.#.#.#.', '#.#.#.#'] },
   AURA: { s1: ['..#....', '.#.....', '..##...', '...#...', '..#....'],
           s2: ['..#.#..', '.#####.', '.#####.', '..###..', '...#...'],
           s3: ['...#...', '..###..', '.#.#.#.', '...#...', '.#.#.#.'] },
@@ -5291,6 +5504,9 @@ const SKILL_ICONS = {
           s3: ['...#...', '...#...', '...#...', '#.###.#', '.#.#.#.'] }
 };
 const SKILL_ICONS_AIR = {
+  DRAKO: { s1: ['......#', '....##.', '..##...', '.#.....', '#......'],
+           s2: ['...#...', '..#.#..', '.#.#.#.', '.#####.', '..###..'],
+           s3: ['#.#.#.#', '.#.#.#.', '#.#.#.#', '.#.#.#.', '#.#.#.#'] },
   AURA: { s1: ['....#..', '...#...', '..###..', '.#.....', '#......'],
           s2: ['..#.#..', '.#####.', '.#####.', '..###..', '...#...'],
           s3: ['...#...', '..###..', '.#.#.#.', '...#...', '.#.#.#.'] },
@@ -5304,6 +5520,7 @@ const SKILL_ICONS_AIR = {
 const CHAR_INFO = {
   RAZE: { ko: '근접 연타형', desc: '쌍단검과 돌진으로 몰아붙이는 그림자 결투가', stats: [['SPD', 5], ['RNG', 2], ['POW', 3], ['DEF', 2]] },
   ORIN: { ko: '원거리 견제형', desc: '장창과 판금 갑옷으로 거리를 지배하는 기사', stats: [['SPD', 2], ['RNG', 5], ['POW', 4], ['DEF', 4]] },
+  DRAKO: { ko: '드래곤 딜러', desc: '뿔과 날개, 꼬리를 가진 인간형 드래곤 · 손톱·꼬리·화염으로 몰아친다', stats: [['SPD', 4], ['RNG', 2], ['POW', 5], ['DEF', 1]] },
   AURA: { ko: '해파리 서포터', desc: '등 뒤의 큰 해파리가 전기로 공격 · 회복과 강화로 팀을 돕는다', stats: [['SPD', 3], ['RNG', 2], ['POW', 2], ['DEF', 2]] },
   KAI: { ko: '일본도 평타형', desc: '스킬 없이 평타만! 상황·조준·순서마다 다른 평타 13종', stats: [['SPD', 4], ['RNG', 3], ['POW', 3], ['DEF', 3]] }
 };
@@ -5596,6 +5813,10 @@ class AI {
   neutral(dist, fwd, back) {
     const me = this.me, o = me.opp, L = this.L, ch = me.def.id, cd = me.cd;
     const pref = ch === 'ORIN' ? 40 : ch === 'AURA' ? 20 : 20, dirOf = k => (k === 'r' ? 1 : -1);
+    if (ch === 'DRAKO' && me.onGround) {                             // 딜러: 가까우면 꼬리·화염·난무로 몰아침
+      if (cd.s2 === 0 && dist < 26 && this.roll(0.25 * L.aggro + 0.05)) { this.press('s2'); return; }
+      if (cd.s1 === 0 && dist < 22 && this.roll(0.2 * L.aggro)) { this.press('s1'); return; }
+    }
     if (ch === 'AURA' && me.onGround) {                              // 서포터: 다치면 회복, 가까우면 강화 + 밀쳐내기
       const hurtAlly = alliesOf(me).some(a => a.hp / a.maxHp < 0.6 && Math.abs(a.x - me.x) < 90);
       if (cd.s2 === 0 && hurtAlly && dist > 28 && this.roll(0.5)) { this.press('s2'); return; }
@@ -6583,11 +6804,18 @@ const CharScene = {
       this.rects.push({ x, y, w, h });
       panel(x, y, w, h, 0.9, sel ? (this.t % 20 < 14 ? PAL.yellow : PAL.orange) : PAL.indigo);
       if (this.cfg.pick && Game.p1Char === id) drawText('LAST', x + w - 4, y + 4, PAL.green, { align: 'right' });
-      const small = n > 3, ps = small ? 1.7 : 2, px = (small ? x + 17 : x + 22) + (d.hover ? 8 : 0), tx = small ? x + 34 : x + 44, rl = roleOf(id);
-      g.save(); g.beginPath(); g.rect((x + 1) * RES, (y + 1) * RES, (w - 2) * RES, (h - 2) * RES); g.clip();   // 카드 밖으로 안 나가게
-      drawFighterScaled(this.prev[i], px, y + 62, ps);
-      g.restore();
-      R(px - 14 - (d.hover ? 0 : 0), y + 63, 28, 1.5, SIDE_COL[0]);
+      const rl = roleOf(id), clip = () => { g.save(); g.beginPath(); g.rect((x + 1) * RES, (y + 1) * RES, (w - 2) * RES, (h - 2) * RES); g.clip(); };   // 카드 밖으로 안 나가게
+      if (n > 4) {                                                    // 5명 이상: 위에 그림, 아래에 이름·역할
+        const px = x + w / 2 + (d.hover ? 6 : 0);
+        clip(); drawFighterScaled(this.prev[i], px, y + 45, 1.45); g.restore();
+        R(x + 6, y + 46, w - 12, 1, SIDE_COL[0]);
+        drawText(d.name, x + w / 2, y + 49, sel ? PAL.white : PAL.lgray, { align: 'center' });
+        kText(rl.ko, x + w / 2, y + 55, rl.col, { align: 'center', size: 9 });
+        return;
+      }
+      const small = n > 3, ps = small ? 1.7 : 2, px = (small ? x + 17 : x + 22) + (d.hover ? 8 : 0), tx = small ? x + 34 : x + 44;
+      clip(); drawFighterScaled(this.prev[i], px, y + 62, ps); g.restore();
+      R(px - 14, y + 63, 28, 1.5, SIDE_COL[0]);
       drawText(d.name, tx, y + 8, sel ? PAL.white : PAL.lgray, { scale: 2 });
       R(tx - 1, y + 21, 26, 11, '#141628'); rectLine(tx - 1, y + 21, 26, 11, rl.col);
       kText(rl.ko, tx + 12, y + 22, rl.col, { align: 'center', size: 10 });
