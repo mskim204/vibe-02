@@ -3272,6 +3272,10 @@ function poseBody(f) {
     case 'attack': attackBody(f, P, L); break;
   }
   if (!f.onGround && !P.air && a !== 'down') air(2.4, L * 0.8, -2, L * 0.86);
+  if (f.def.hover && f.onGround && !P.air && a !== 'down' && a !== 'attack') {   // 떠 있는 느낌: 발끝을 늘어뜨림 (몸 높이는 그대로)
+    const sw = Math.sin(f.frame * 0.08) * 0.6, tr = -f.vx * f.facing * 0.6;
+    P.fF = V(P.fF.x * 0.5 + 0.6 + sw + tr, Math.min(P.fF.y, -0.6)); P.fB = V(P.fB.x * 0.5 - 0.8 - sw + tr, Math.min(P.fB.y, -1.0));
+  }
   return P;
 }
 function attackBody(f, P, L) {
@@ -3855,7 +3859,7 @@ function drawHumanBase(R0, f, J, o) {
   if (o.weaponBack) o.weaponBack(R0, J, G.wB);
   R.cap(J.hipB, J.knB, 1.45, 1.1, o.bottom, G.lB, true);
   R.cap(J.knB, J.anB, 1.08, 0.78, o.bottom, G.lB, true);
-  R.cap(J.anB, vadd(J.anB, V(1.9, 0.25)), 0.76, 0.6, o.shoe, G.lB, true);
+  R.cap(J.anB, vadd(J.anB, o.foot ? o.foot(f) : V(1.9, 0.25)), 0.76, 0.6, o.shoe, G.lB, true);
   R.back = 0;
   // 몸통: 어깨 → 잘록한 허리 → 골반
   const waist = vadd(hip, u, 3.2);
@@ -3866,7 +3870,7 @@ function drawHumanBase(R0, f, J, o) {
   // 앞다리
   R.cap(J.hipF, J.knF, 1.5, 1.14, o.bottom, G.lF, true);
   R.cap(J.knF, J.anF, 1.12, 0.8, o.bottom, G.lF, true);
-  R.cap(J.anF, vadd(J.anF, V(1.9, 0.25)), 0.78, 0.62, o.shoe, G.lF, true);
+  R.cap(J.anF, vadd(J.anF, o.foot ? o.foot(f) : V(1.9, 0.25)), 0.78, 0.62, o.shoe, G.lF, true);
   // 목 · 깃
   R.cap(vadd(neck, u, 0.2), vadd(head, hu, -2.6), 0.85, 0.8, 'skin', G.neck, true);
   if (o.collar) o.collar(R0, J, G.neck);
@@ -4142,35 +4146,37 @@ const AURA_MATS = buildMats({
 // 해파리 위치: 머리 뒤 위쪽에서 둥실둥실, 공격할 땐 조준 방향으로 살짝 다가감
 function jellyPos(f, J) {
   const bob = Math.sin(f.frame * 0.07) * 1.2, atk = f.state === 'attack' && f.move;
-  let p = vadd(J.head, V(-8.5, -8 + bob));
+  let p = vadd(J.head, V(-12, -12 + bob));
   if (atk) { const ph = f.phaseOf(f.moveK); if (ph !== 'r') p = vadd(p, dirOf(f.moveAim), ph === 'a' ? 3.5 : 1.5); }
   return p;
 }
 function drawJelly(R, f, J) {
   const c = jellyPos(f, J), t = f.frame, gp = 1;
   // 촉수: 종 아랫단에서 물결치며 늘어짐
-  for (let i = 0; i < 5; i++) {
-    let p = vadd(c, V(-4.6 + i * 2.3, 3.4));
-    for (let s = 0; s < 4; s++) {
-      const q = vadd(p, V(Math.sin(t * 0.12 + i * 1.3 + s * 0.9) * 0.9 - f.vx * 0.25, 2.3));
-      R.cap(p, q, 0.42 - s * 0.06, 0.36 - s * 0.06, s % 2 ? 'lime' : 'jelly', gp, false);
+  // 일반 캐릭터보다 살짝 큰 해파리: 종 22 x 16 + 긴 촉수
+  for (let i = 0; i < 6; i++) {
+    let p = vadd(c, V(-8 + i * 3.2, 5.6));
+    for (let s = 0; s < 6; s++) {
+      const q = vadd(p, V(Math.sin(t * 0.11 + i * 1.3 + s * 0.8) * 1.0 - f.vx * 0.3, 2.6));
+      R.cap(p, q, 0.55 - s * 0.06, 0.48 - s * 0.06, s % 2 ? 'lime' : 'jelly', gp, false);
       p = q;
     }
   }
   // 종(갓): 핑크 반투명 느낌 — 안쪽에 연두 빛 무늬
-  R.ell(c, 7.2, 5.2, 0, 'jelly', gp, false);
-  R.ell(vadd(c, V(0.3, 2.6)), 6.4, 1.6, 0, 'jelly', gp, false);
-  R.ell(vadd(c, V(-2.2, -0.6)), 1.1, 0.8, 0, 'lime', gp, false);
-  R.ell(vadd(c, V(1.4, -1.4)), 0.9, 0.6, 0, 'lime', gp, false);
-  R.ell(vadd(c, V(3.4, 0.6)), 0.7, 0.55, 0, 'lime', gp, false);
-  R.dot(vadd(c, V(-3.6, -2.4)), '#ffffff'); R.dot(vadd(c, V(-3.0, -3.0)), '#ffffff');
+  R.ell(c, 11, 8, 0, 'jelly', gp, false);
+  R.ell(vadd(c, V(0.3, 4.2)), 10, 2.4, 0, 'jelly', gp, false);
+  R.ell(vadd(c, V(-3.4, -1.0)), 1.7, 1.2, 0, 'lime', gp, false);
+  R.ell(vadd(c, V(2.2, -2.2)), 1.4, 0.95, 0, 'lime', gp, false);
+  R.ell(vadd(c, V(5.2, 1.0)), 1.1, 0.8, 0, 'lime', gp, false);
+  R.ell(vadd(c, V(-0.6, 2.2)), 0.9, 0.6, 0, 'lime', gp, false);
+  R.dot(vadd(c, V(-5.8, -3.8)), '#ffffff'); R.dot(vadd(c, V(-5.0, -4.6)), '#ffffff'); R.dot(vadd(c, V(-6.4, -2.8)), '#ffffff');
 }
 // 전기: 해파리에서 공격 지점까지 지그재그 번개 (핑크 + 연두)
 function drawZap(R, f, J) {
   const s = J.smear;
   if (!s || !(f.state === 'attack')) return;
   const a = s.type === 'arc' ? s.a1 : s.type === 'ring' ? s.a : s.a;
-  const r1 = s.r1 || 24, A = vadd(jellyPos(f, J), V(0, 3.5)), B = vadd(J.shF, dirOf(a), r1);
+  const r1 = s.r1 || 24, A = vadd(jellyPos(f, J), V(0, 6)), B = vadd(J.shF, dirOf(a), r1);
   const d = V(B.x - A.x, B.y - A.y), L = Math.hypot(d.x, d.y) || 1, pv = V(-d.y / L, d.x / L), n = 6, gp = 14;
   let prev = A, prev2 = A;
   for (let i = 1; i <= n; i++) {
@@ -4184,6 +4190,7 @@ function drawZap(R, f, J) {
 }
 const AURA_LOOK = {
   top: 'dress', sleeve: 'dress', bottom: 'leg', shoe: 'shoe', k: 0.86, noSmear: true,
+  foot(f) { return f.state === 'down' ? V(1.9, 0.25) : V(1.0, 1.3); },          // 발끝이 아래로 (떠 있는 느낌)
   behind(R, f, J) { drawJelly(R, f, J); },
   belted(R, J, gp) {                                             // 해파리 종처럼 퍼지는 짧은 치마
     const { hip, u, n } = J;
@@ -4315,7 +4322,7 @@ const CHARS = {
     dim: { hipH: 9.4, thigh: 5.0, shin: 5.0, torso: 6.8, headR: 3.1, upper: 4.1, fore: 3.9, crouchH: 13, crouchTop: 14.4 },
     mats: AURA_MATS, fx: { col: PAL.pink },
     guard: { name: 'JELLY VEIL', just: 9, gauge: 95, bsMul: 0.9, push: 1.0, jgStagger: 20, arc: 1.1, zone: false },
-    moves: AURA_MOVES, draw: drawAura, idleArms: auraIdleArms, guardArms: auraGuardArms
+    moves: AURA_MOVES, hover: true, draw: drawAura, idleArms: auraIdleArms, guardArms: auraGuardArms
   }
 };
 // 역할: 딜러(공격↑ 안전성↓) · 탱커(안전성↑ 공격↓) · 서포터(회복·강화, 대신 약함) · 유틸(다인전 특화)
@@ -4863,8 +4870,14 @@ class Fighter {
     this.topY = top;
   }
 
+  // 보이는 것만 떠 있음 (판정·움직임은 그대로)
+  get lift() { return this.def.hover && this.state !== 'down' && this.state !== 'getup' ? 4 + Math.sin(this.frame * 0.08) * 1.2 : 0; }
   draw() {
-    drawSprite(this.spr.cv, this.x, this.y);
+    const lift = this.lift;
+    if (lift && this.onGround) {                                   // 바닥에 비치는 은은한 빛
+      g.globalAlpha = 0.35; R(snap(this.x - 5), snap(this.y - 0.5), 10, 1, '#ff9ad0'); R(snap(this.x - 3), snap(this.y - 1), 6, 0.5, '#d4f59a'); g.globalAlpha = 1;
+    }
+    drawSprite(this.spr.cv, this.x, this.y - lift);
     if (this.buffT > 0) for (let i = 0; i < 4; i++) {           // 강화 버프: 몸 주변을 도는 핑크·연두 빛
       const a = this.frame * 0.12 + i * PI / 2, r = 9;
       R(snap(this.x + Math.cos(a) * r), snap(this.y - 13 + Math.sin(a) * r * 0.6), 1, 1, i % 2 ? '#d4f59a' : '#ff9ad0');
@@ -4872,7 +4885,7 @@ class Fighter {
     const blink = (this.state === 'dash' || this.state === 'getup' || (this.state === 'attack' && this.invuln > 0)) && this.invuln > 0 && this.frame % 2 === 0;
     if (this.flash > 0 || blink) {
       g.globalAlpha = this.flash > 0 ? 0.7 : 0.4;
-      drawSprite(this.spr.silhouette(hexRgb(this.flash > 0 && this.flashCol ? this.flashCol : PAL.white)), this.x, this.y);
+      drawSprite(this.spr.silhouette(hexRgb(this.flash > 0 && this.flashCol ? this.flashCol : PAL.white)), this.x, this.y - lift);
       g.globalAlpha = 1;
     }
   }
@@ -5264,7 +5277,7 @@ function drawIcon(rows, x, y, col) {     // 7x5 아이콘 → EPX 14x10, 반 픽
   if (!pts) { pts = epx((i, j) => (rows[j][i] === '#' ? 1 : 0), rows[0].length, rows.length); ICON2.set(rows, pts); }
   for (const [px, py] of pts) R(x + px * 0.5, y + py * 0.5, 0.5, 0.5, col);
 }
-function drawFighterScaled(f, cx, footY, s) { drawSprite(f.spr.cv, cx, footY, s); }
+function drawFighterScaled(f, cx, footY, s) { drawSprite(f.spr.cv, cx, footY - (f.lift || 0) * s, s); }
 
 const SKILL_ICONS = {
   AURA: { s1: ['..#....', '.#.....', '..##...', '...#...', '..#....'],
