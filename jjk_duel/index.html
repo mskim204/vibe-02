@@ -56,6 +56,12 @@ input,textarea{font-family:inherit}
 .dbmain{flex:1;min-width:0}
 .dbside{width:300px;flex:none;position:sticky;top:72px;background:var(--panel);border:1px solid var(--line);padding:16px;max-height:calc(100vh - 92px);overflow:auto}
 .tabs{display:flex;gap:0;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.dbsearch{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:-4px 0 16px}
+.dbsearch input[type=search]{flex:1;min-width:200px;background:#0b0a09;border:1px solid var(--line2);color:var(--txt);border-radius:2px;padding:9px 12px;font-size:14px;-webkit-user-select:text;user-select:text}
+.dbsearch input[type=search]:focus{outline:none;border-color:var(--mut)}
+.dbmine{font-size:13px;color:var(--mut);display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+#dbHits{font-size:12px;color:var(--mut);white-space:nowrap}
+.dbempty{grid-column:1/-1;text-align:center;color:var(--mut);padding:40px 0;font-size:14px}
 .tab{padding:8px 16px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--mut);font-weight:700;font-size:13px;margin-bottom:-1px}
 .tab:hover{color:var(--txt)}
 .tab.on{color:var(--txt);border-bottom-color:var(--red)}
@@ -473,6 +479,11 @@ body{-webkit-touch-callout:none}
     <div class="dbmain">
       <div class="tabs" id="dbTabs">
         <button class="tab on" data-f="all">전체</button><button class="tab" data-f="unit">유닛 카드</button><button class="tab" data-f="sub">서브 카드</button><button class="tab" data-f="dual">겸용 카드</button><button class="tab" data-f="magic">마법 카드</button>
+      </div>
+      <div class="dbsearch">
+        <input id="dbSearch" type="search" placeholder="카드 검색 — 이름·초성(ㄱㅈ)·기술·궁극기·시너지" autocomplete="off">
+        <label class="dbmine"><input type="checkbox" id="dbMineOnly"> 덱에 넣은 카드만</label>
+        <span id="dbHits"></span>
       </div>
       <div class="dbgrid" id="dbGrid"></div>
     </div>
@@ -3444,11 +3455,28 @@ function updSndBtns(){$('#btnSound').textContent=SFX.on?'사운드 켜짐':'사�
    ========================================================= */
 let myDeck=(LS.get('jjk_deck',null)||DEFAULT_DECK).filter(id=>CARDS[id]);
 if(myDeck.length<15)myDeck=DEFAULT_DECK.slice();
-const DB={f:'all',sel:new Set()};
+const DB={f:'all',sel:new Set(),q:'',mine:false};
+/* 카드 검색: 이름·등급·종류·기술·궁극기·패시브·시너지 이름, 한글 초성(예: ㄱㅈ → 고죠) */
+const CHO='ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+function choOf(t){let r='';for(const ch of t){const c=ch.charCodeAt(0)-0xAC00;r+=(c>=0&&c<11172)?CHO[Math.floor(c/588)]:ch;}return r;}
+const SEARCH_IDX={};
+function searchEntry(id){if(SEARCH_IDX[id])return SEARCH_IDX[id];const C=CARDS[id];
+ const parts=[C.name,C.sn,C.gl,TYPE_NAME[C.type],C.dual?'겸용':'',...(C.sk||[]).map(x=>x.n),C.ult&&C.ult.n,C.ult2&&C.ult2.n,C.pas&&C.pas.n,C.ult?'궁극기':'',...SYN.filter(x=>x.m.includes(id)).map(x=>x.n)].filter(Boolean);
+ const names=(C.name+' '+C.sn).replace(/\s+/g,'');
+ return SEARCH_IDX[id]={t:parts.join('|').replace(/\s+/g,'').toLowerCase(),c:choOf(names)};}
+/* 정렬: 이름이 검색어로 시작 → 이름에 포함 → 기술·궁극기 등에서 일치 */
+function searchScore(id){const q=DB.q.replace(/\s+/g,'').toLowerCase();const C=CARDS[id];
+ const words=[C.sn,C.name,...C.name.split(/[\s·()']+/)].filter(Boolean).map(w=>w.replace(/\s+/g,'').toLowerCase());
+ if(words.some(w=>w.startsWith(q)||choOf(w).startsWith(q)))return 0;
+ if(words.some(w=>w.includes(q)||choOf(w).includes(q)))return 1;return 2;}
+function cardMatches(id){const q=DB.q.replace(/\s+/g,'').toLowerCase();if(!q)return true;const e=searchEntry(id);if(e.t.includes(q))return true;return /^[ㄱ-ㅎ]+$/.test(q)&&e.c.includes(q);}
 function openDeck(){DB.sel=new Set(myDeck);renderDeck();}
 function renderDeck(){
- const list=ALL_IDS.filter(id=>DB.f==='all'||(DB.f==='dual'?isDual(id):DB.f==='sub'?canSub(id):CARDS[id].type===DB.f));
- $('#dbGrid').innerHTML=((DB.f==='all'||DB.f==='unit')?`<div class="dbitem sel special" data-id="mahoraga">${cardHTML('mahoraga')}<div class="chk" style="display:block;white-space:nowrap;background:var(--ochre);color:var(--ink)">항상 장착</div></div>`:'')+list.map(id=>`<div class="dbitem ${DB.sel.has(id)?'sel':''}" data-id="${id}">${cardHTML(id)}<div class="chk">덱</div></div>`).join('');
+ const list=ALL_IDS.filter(id=>(DB.f==='all'||(DB.f==='dual'?isDual(id):DB.f==='sub'?canSub(id):CARDS[id].type===DB.f))&&cardMatches(id)&&(!DB.mine||DB.sel.has(id)));
+ if(DB.q.trim()){const sc={};list.forEach((id,i)=>sc[id]=searchScore(id)*1000+i);list.sort((x,y)=>sc[x]-sc[y]);}
+ const showMaho=(DB.f==='all'||DB.f==='unit')&&!DB.mine&&cardMatches('mahoraga');
+ $('#dbHits').textContent=DB.q||DB.mine?`검색 결과 ${list.length+(showMaho?1:0)}장`:`${list.length+(showMaho?1:0)}장`;
+ $('#dbGrid').innerHTML=(!list.length&&!showMaho?'<div class="dbempty">찾는 카드가 없습니다.</div>':'')+(showMaho?`<div class="dbitem sel special" data-id="mahoraga">${cardHTML('mahoraga')}<div class="chk" style="display:block;white-space:nowrap;background:var(--ochre);color:var(--ink)">항상 장착</div></div>`:'')+list.map(id=>`<div class="dbitem ${DB.sel.has(id)?'sel':''}" data-id="${id}">${cardHTML(id)}<div class="chk">덱</div></div>`).join('');
  const n=DB.sel.size;$('#dbMini').textContent=`${n}장`;$('#dbMini').className='dbmini '+(n<15?'bad':'good');const cnt=$('#dbCount');cnt.textContent=n+'장'+(n<15?` (${15-n}장 부족)`:'');cnt.className='dcount '+(n<15?'bad':'good');
  const tc={unit:0,sub:0,magic:0};DB.sel.forEach(id=>tc[CARDS[id].type]++);
  $('#dbTypes').innerHTML=`<span><b>${tc.unit}</b>유닛</span><span><b>${tc.sub}</b>서브</span><span><b>${tc.magic}</b>마법</span>`;
@@ -3458,6 +3486,9 @@ function renderDeck(){
   return `<div class="combo"><b>${esc(CARDS[id].sn)}</b> 「${esc(U.n)}」<br><span class="${subOk?'ok':'no'}">서브: ${U.sub==='any'?'아무 서브':U.sub.map(s=>CARDS[s].sn).join('/')}${subOk?'':' (덱에 없음)'}</span> · <span class="${mgOk?'ok':'no'}">마법: ${U.mg.map(m=>CARDS[m].sn).join('/')}${mgOk?'':' (덱에 없음)'}</span>${U.need==='halfhp'?' · <span class="no">체력 절반 이하일 때만</span>':''}</div>`}).join(''):'<div class="combo" style="color:var(--mut)">궁극기를 가진 유닛(極 표시)을 넣어보세요.</div>';
 }
 $('#dbGrid').onclick=e=>{const it=e.target.closest('.dbitem');if(!it)return;const id=it.dataset.id;if(CARDS[id].special){toast('마허라는 항상 장착되어 있습니다. 대전 중 조건을 맞추면 소환할 수 있습니다.');return;}if(DB.sel.has(id))DB.sel.delete(id);else DB.sel.add(id);SFX.play(DB.sel.has(id)?'place':'click');renderDeck();};
+$('#dbSearch').oninput=()=>{DB.q=$('#dbSearch').value;renderDeck();};
+$('#dbSearch').onkeydown=e=>{if(e.key==='Escape'){$('#dbSearch').value='';DB.q='';renderDeck();}};
+$('#dbMineOnly').onchange=()=>{DB.mine=$('#dbMineOnly').checked;renderDeck();};
 $('#dbTabs').onclick=e=>{const t=e.target.closest('.tab');if(!t)return;DB.f=t.dataset.f;$$('#dbTabs .tab').forEach(x=>x.classList.toggle('on',x===t));renderDeck();};
 $('#dbRec').onclick=()=>{DB.sel=new Set(DEFAULT_DECK);renderDeck();toast('추천 덱을 불러왔습니다. 저장을 눌러주세요.');};
 $('#dbAll').onclick=()=>{ALL_IDS.forEach(id=>DB.sel.add(id));renderDeck();};
