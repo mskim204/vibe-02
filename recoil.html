@@ -4371,19 +4371,24 @@ function drawBreath(R, f, J) {
   }
 }
 const DRAKO_LOOK = {
-  top: 'skin', sleeve: 'scale', bottom: 'skin', shin: 'scale', shoe: 'scale', noSmear: true,
+  top: 'band', sleeve: 'scale', bottom: 'band', shin: 'scale', shoe: 'scale', noSmear: true,   // 몸통·윗팔·허벅지를 띠로 감쌈
   behind(R, f, J) { drawDrakoWing(R, f, J, true); drawDrakoTail(R, f, J); drawDrakoWing(R, f, J, false); },
   // 옷 대신 두른 갈색 띠: 가슴을 비스듬히 감고, 허리를 감은 뒤 앞뒤로 살짝 길게 늘어짐
   belted(R, J, gp) {
     const { hip, neck, u, n } = J;
     const band = (a, b, w) => { const d = V(b.x - a.x, b.y - a.y), L = Math.hypot(d.x, d.y) || 1, p = V(-d.y / L * w, d.x / L * w);
       R.poly([vadd(a, p), vadd(b, p), vadd(b, p, -1), vadd(a, p, -1)], 'band', gp, true); };
-    band(vadd(vadd(neck, n, -2.0), u, -0.8), vadd(vadd(hip, n, 1.7), u, 3.8), 0.75);          // 어깨 → 반대쪽 옆구리
-    band(vadd(vadd(neck, n, 1.9), u, -1.6), vadd(vadd(hip, n, -1.6), u, 4.4), 0.6);
+    // 몸통을 여러 번 감은 띠: 감긴 자국(진한 선)으로 겹겹이 보이게
+    for (let i = 0; i < 5; i++) {
+      const t = 0.12 + i * 0.19, a = vadd(vlerp(hip, neck, t), n, -2.1), b = vadd(vadd(vlerp(hip, neck, t + 0.1), n, 2.0), u, 0);
+      R.dline(a, b, '#8a6a44');
+    }
+    band(vadd(vadd(neck, n, -2.0), u, -0.8), vadd(vadd(hip, n, 1.7), u, 3.8), 0.75);          // 어깨 → 반대쪽 옆구리로 한 번 더
+    R.dline(vadd(vadd(neck, n, 0.2), u, 0.3), vadd(vadd(neck, n, 1.4), u, 0.1), '#e0a27c');   // 목 아래 살짝 드러난 피부
     R.poly([vadd(vadd(hip, u, 1.6), n, -2.1), vadd(vadd(hip, u, 1.6), n, 2.0), vadd(vadd(hip, u, -1.2), n, 2.1), vadd(vadd(hip, u, -1.4), n, -2.2)], 'band', gp, true);   // 허리 감기
     const sw = Math.sin(J.lean * 3) * 0.4;
-    R.poly([vadd(vadd(hip, u, -0.8), n, 0.6), vadd(vadd(hip, u, -0.8), n, 1.9), vadd(vadd(hip, u, -6.2), n, 1.6 + sw), vadd(vadd(hip, u, -6.0), n, 0.5 + sw)], 'band', gp, true);   // 앞 자락
-    R.poly([vadd(vadd(hip, u, -0.6), n, -1.9), vadd(vadd(hip, u, -0.6), n, -0.6), vadd(vadd(hip, u, -5.4), n, -1.2 - sw), vadd(vadd(hip, u, -5.6), n, -2.4 - sw)], 'band', gp, true);   // 뒤 자락
+    R.poly([vadd(vadd(hip, u, -0.8), n, -0.2), vadd(vadd(hip, u, -0.8), n, 2.1), vadd(vadd(hip, u, -7.4), n, 2.0 + sw), vadd(vadd(hip, u, -7.2), n, -0.1 + sw)], 'band', gp, true);   // 앞 자락 (무릎까지)
+    R.poly([vadd(vadd(hip, u, -0.6), n, -2.1), vadd(vadd(hip, u, -0.6), n, -0.4), vadd(vadd(hip, u, -6.8), n, -1.0 - sw), vadd(vadd(hip, u, -7.0), n, -2.6 - sw)], 'band', gp, true);   // 뒤 자락
   },
   hairStyle(R, J, gp) {
     const { head, hu, hn } = J;
