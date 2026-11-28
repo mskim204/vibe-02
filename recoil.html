@@ -4146,7 +4146,7 @@ const AURA_MATS = buildMats({
 // 해파리 위치: 머리 뒤 위쪽에서 둥실둥실, 공격할 땐 조준 방향으로 살짝 다가감
 function jellyPos(f, J) {
   const bob = Math.sin(f.frame * 0.07) * 1.2, atk = f.state === 'attack' && f.move;
-  let p = vadd(J.head, V(-12, -12 + bob));
+  let p = vadd(J.head, V(-6.5, -9.5 + bob));                    // 캐릭터 바로 뒤 위에 붙어 다님
   if (atk) { const ph = f.phaseOf(f.moveK); if (ph !== 'r') p = vadd(p, dirOf(f.moveAim), ph === 'a' ? 3.5 : 1.5); }
   return p;
 }
