@@ -4548,6 +4548,7 @@ const ROLES = {
   SUPPORT: { ko: '서포터', col: '#ff9ad0', out: 0.88, in: 1.00, desc: '자신과 팀원을 회복·강화, 대신 약함' },
   UTILITY: { ko: '유틸',   col: '#c8f07a', out: 1.00, in: 1.00, desc: '다인전 특화 · 다루기 굉장히 어려움' }
 };
+const ROLE_ORDER = ['DEALER', 'TANK', 'SUPPORT', 'UTILITY'];
 const roleOf = id => ROLES[(CHARS[id] || {}).role] || ROLES.UTILITY;
 const CHAR_LIST = ['RAZE', 'ORIN', 'KAI', 'AURA', 'DRAKO'];
 const UNIQUE_PICK_MIN = 8;   // 캐릭터가 8명 이상이 되면 팀 대전(2:2 · 4:4)에서 같은 캐릭터 중복 선택 불가
@@ -6790,17 +6791,66 @@ const CharScene = {
   update() {
     this.t++;
     for (const f of this.prev) { f.frame++; f.animT++; f.buildRig(); }
-    if (MI.left() || MI.right()) { this.sel = (this.sel + 1) % CHAR_LIST.length; SFX.play('blip'); }
-    if (Keys.mouseMoved) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) this.sel = i; });
+    if (this.cfg.pick) this.navRoles();
+    else if (MI.left() || MI.right()) { this.sel = (this.sel + (MI.left() ? CHAR_LIST.length - 1 : 1)) % CHAR_LIST.length; SFX.play('blip'); }
+    if (Keys.mouseMoved) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) this.sel = r.idx !== undefined ? r.idx : i; });
     let clicked = false;
-    if (Keys.pressed.has('Mouse0')) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) { this.sel = i; clicked = true; } });
+    if (Keys.pressed.has('Mouse0')) this.rects.forEach((r, i) => { if (inRect(Keys.mx, Keys.my, r)) { this.sel = r.idx !== undefined ? r.idx : i; clicked = true; } });
     const c = this.cfg;
     if ((MI.ok() || clicked) && c.pick) { Game.p1Char = CHAR_LIST[this.sel]; SFX.play('select'); c.onPick(Game.p1Char); }
     else if (MI.back()) { SFX.play('back'); c.onBack(); }
   },
+  // ---- 대전 전 캐릭터 선택: 역할별 줄 + 얼굴 초상화 ----
+  roleRows() { return ROLE_ORDER.map(r => ({ role: r, ids: CHAR_LIST.filter(id => CHARS[id].role === r) })); },
+  navRoles() {
+    const rows = this.roleRows(), id = CHAR_LIST[this.sel];
+    let r = rows.findIndex(x => x.ids.includes(id)), c = Math.max(0, rows[r].ids.indexOf(id));
+    const set = (rr, cc) => { const ids = rows[rr].ids; if (!ids.length) return false; this.sel = CHAR_LIST.indexOf(ids[clamp(cc, 0, ids.length - 1)]); SFX.play('blip'); return true; };
+    if (MI.left()) set(r, c - 1);
+    if (MI.right()) set(r, c + 1);
+    if (MI.up()) for (let k = r - 1; k >= 0; k--) if (set(k, c)) break;
+    if (MI.down()) for (let k = r + 1; k < rows.length; k++) if (set(k, c)) break;
+  },
+  drawFace(f, x, y, w, h) {                                       // 머리 부분만 확대해서 보여줌
+    const s = 2.6, hd = f.J.head;
+    g.save(); g.beginPath(); g.rect(x * RES, y * RES, w * RES, h * RES); g.clip();
+    drawSprite(f.spr.cv, x + w / 2 - hd.x * s, y + h / 2 + 1 - (hd.y - 1) * s, s);
+    g.restore();
+  },
+  renderPick() {
+    this.rects = [];
+    const rows = this.roleRows(), selId = CHAR_LIST[this.sel];
+    rows.forEach((row, ri) => {
+      const y = 20 + ri * 29, rl = ROLES[row.role];
+      R(6, y, 166, 27, 'rgba(11,11,20,0.6)'); rectLine(6, y, 166, 27, rl.col);
+      kText(rl.ko, 24, y + 8, rl.col, { align: 'center', size: 11 });
+      if (!row.ids.length) kText('아직 없음', 100, y + 8, PAL.gray, { align: 'center', size: 10 });
+      row.ids.forEach((id, ci) => {
+        const x = 44 + ci * 32, bx = { x, y: y + 2, w: 28, h: 23 }, sel = id === selId, idx = CHAR_LIST.indexOf(id);
+        this.rects.push(Object.assign({ idx }, bx));
+        R(bx.x, bx.y, bx.w, bx.h, sel ? '#3a3f6b' : '#1d1f3a');
+        this.drawFace(this.prev[idx], bx.x, bx.y, bx.w, bx.h);
+        rectLine(bx.x, bx.y, bx.w, bx.h, sel ? (this.t % 20 < 14 ? PAL.yellow : PAL.orange) : '#3a3f6b');
+        if (Game.p1Char === id) R(bx.x + bx.w - 3, bx.y + 1, 2, 2, PAL.green);
+      });
+    });
+    // 오른쪽: 고른 캐릭터 정보
+    const id = selId, d = CHARS[id], info = CHAR_INFO[id], rl = roleOf(id), x0 = 178;
+    panel(x0, 20, VW - x0 - 6, 114, 0.92, rl.col);
+    drawText(d.name, x0 + 6, 26, PAL.white, { scale: 2 });
+    drawText(d.title, x0 + 6, 40, SIDE_COL[0]);
+    kText(rl.ko + ' · ' + info.ko, x0 + 6, 48, rl.col, { size: 10 });
+    info.stats.forEach(([k, v], j) => { const sy = 62 + j * 8; drawText(k, x0 + 6, sy, PAL.lgray); for (let b = 0; b < 5; b++) R(x0 + 22 + b * 7, sy, 6, 5, b < v ? PAL.cyan : PAL.dgray); });
+    const mv = d.moves, lines = d.noSkills ? [['', 'NO SKILLS'], ['', '13 CONTEXT NORMALS'], ['G', d.guard.name]] : [['Q', mv.Q.name], ['E', mv.E.name], ['R', mv.R.name], ['G', d.guard.name]];
+    lines.forEach(([k, nm], j) => { const sy = 98 + j * 8; drawText(k, x0 + 6, sy, PAL.yellow); drawText(nm, x0 + 14, sy, PAL.white); });
+    kText(info.desc, VW / 2, 139, PAL.cyan, { align: 'center', size: 10 });
+    kText('[' + rl.ko + '] ' + rl.desc, VW / 2, 151, rl.col, { align: 'center', size: 10 });
+    kText('W/S 역할 줄 · A/D 캐릭터 · ENTER·클릭 결정 · ESC 뒤로', VW / 2, VH - 15, PAL.gray, { align: 'center', size: 10 });
+  },
   render() {
     MenuBG.draw();
     kText(this.cfg.title, VW / 2, 4, PAL.yellow, { align: 'center', size: 13 });
+    if (this.cfg.pick) { this.renderPick(); return; }
     this.rects = [];
     // 위: 캐릭터 카드 / 아래: 고른 캐릭터 상세
     const n = CHAR_LIST.length, cw = Math.floor((VW - 16 - (n - 1) * 4) / n);
